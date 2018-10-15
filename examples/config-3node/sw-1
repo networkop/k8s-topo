@@ -1,0 +1,22 @@
+! Command: show running-config
+! device: sw-1 (cEOSLab, EOS-4.20.0F-7750582.regmifebeftfix0 (engineering build))
+!
+transceiver qsfp default-mode 4x10G
+!
+hostname sw-1
+!
+spanning-tree mode mstp
+!
+no aaa root
+!
+interface Ethernet1
+   no switchport
+   ip address 12.12.12.1/24
+!
+interface Ethernet2
+   no switchport
+   ip address 13.13.13.1/24
+!
+no ip routing
+!
+end

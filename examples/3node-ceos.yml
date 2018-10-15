@@ -1,0 +1,8 @@
+etcd_port: 32781
+ceos_image: 172.16.0.46:5000/ceos:4.20.0F
+conf_dir: ./config-3node
+links:
+  - endpoints: ["sw-1:eth1", "sw-2:eth1"]
+  - endpoints: ["sw-1:eth2", "sw-3:eth1"]
+  - endpoints: ["sw-2:eth2", "sw-3:eth2"]
+

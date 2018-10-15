@@ -1,0 +1,424 @@
+#!/usr/bin/env python3
+import argparse
+import logging
+import yaml
+import netaddr
+import os
+import etcd3
+import json
+from kubernetes import client, config
+
+# Initialise logging
+LOG = logging.getLogger(__name__)
+
+# Initialise k8s client
+config.load_kube_config()
+K8S = client.CoreV1Api()
+
+# seting up defaults defaults
+ETCD_HOST = "localhost"
+ETCD_PORT = 2379
+CEOS_IMAGE = 'ceos:latest'
+CONF_DIR = './config'
+PUBLISH_BASE = 30000
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Tool to create network topologies inside k8s")
+    parser.add_argument(
+        '-d', '--debug',
+        help='Enable Debug',
+        action='store_true'
+    )
+    
+    m_group = parser.add_argument_group(title="Actions", description="Create or destroy topology")
+    main_group = m_group.add_mutually_exclusive_group()
+    main_group.add_argument(
+        "--create",
+        help="Create topology",
+        action="store_true"
+    )
+    main_group.add_argument(
+        "--destroy",
+        help="Destroy topology",
+        action="store_true"
+    )
+    main_group.add_argument(
+        "--list",
+        help="Show running topology",
+        action="store_true"
+    )
+
+    parser.add_argument(
+        "topology",
+        help='Topology file',
+        type=str
+    )
+    args = parser.parse_args()
+    return args
+
+def parse_yaml(t_yml):
+    """
+    Reads the topology definition in the following format:
+    links:
+      - endpoints: ["Device-A:Interface-1", "Device-B:Interface-3"]
+      - endpoints: ["Device-A:Interface-2", "host-B:Interface-3:12.12.12.1/24"]
+    Returns a dict of devices and a list links
+    """
+    devices = dict()
+    links = list()
+    for idx, link_dsc in enumerate(t_yml['links']):
+        link_endpoints = link_dsc.get('endpoints', None)
+        # Example: link_endpoints = ["Device-A:Interface-2", "host-B:Interface-3:12.12.12.1/24"]
+        if not link_endpoints:
+            LOG.error("Missing endpoints definition")
+        elif len(link_endpoints) > 2:
+            LOG.error(f"Only point-to-point links are supported : \n{link_dsc}")
+        link = Link("p2p", idx)
+        links.append(link)
+        parse_endpoints(devices, link_endpoints, link, idx)
+    return devices, links
+
+def parse_endpoints(devices, endpoints, link, idx):
+    """
+    Parses a single endpoints list in the format:
+    ["Device-A:Interface-1", "host-3:Eth2:192.168.10.30/24"]
+    Updates devices dictionary
+    """
+    for endpoint in endpoints:
+        # Example: ep == "host-3:Eth2:192.168.10.30/24"
+        ep = endpoint.split(':')
+        # Example: ep == ["host-3", "Eth2", "192.168.10.30/24"]
+        if not ep:
+            LOG.error('Link contains empty definition')
+        device_name = ep.pop(0)
+        # Example: device_name == "host-3"
+        # We only support Host and CEOS device types
+        if 'host' in device_name.lower():
+            # Example: ep == ["Eth2","192.168.10.30/24"]
+            device = devices.get(device_name, Host(device_name))
+            if len(ep) > 1:
+                # This means we have intf name _AND_ IP address
+                ip = ep.pop()
+                device.add_ip(ip, ep[0])            
+        else:
+            # This creates default CEOS device type
+            device = devices.get(device_name, CEOS(device_name))
+        int_name = ep.pop()
+        # Remember device connections
+        device.connect(int_name, link)
+        devices[device_name] = device 
+    return 
+
+def compare_links(received,stored):
+    # Sorting internal dicts
+    received = set([json.dumps(el, sort_keys=True) for el in received])
+    stored = set([json.dumps(el, sort_keys=True) for el in stored])
+    delta = received.difference(stored)
+    LOG.debug(f'Delta between received and stored: {delta}')
+    # Returning True if delta is not set([])
+    return not bool(delta)
+
+
+class Device(object):
+    def __init__(self, name):
+        self.name = name
+        self.type = ''
+        self.interfaces = dict()
+        self.ips = dict()
+        self.environment = dict()
+        self.command = list()
+        self.image = ''
+        self.environment = []
+        self.full_links = list()
+        self.ips = dict()
+        self.entry_cmd = f"kubectl exec -it {self.name} sh"
+        self.config_present = True
+        # pointer to a k8s pod
+        self.pod = None
+        # Path to mount configuration files
+        self.conf_path = "/etc/"
+        self.startup_file = "config"
+    
+    def get(self):
+        return K8S.list_namespaced_pod(namespace="default", field_selector=f"metadata.name={self.name}").items
+
+    def configure(self, text=""):
+        startup = os.path.join(CONF_DIR, self.name)
+        if os.path.isfile(startup):
+            with open(startup) as f:
+                text = f.read()
+        else:
+            # TODO: do something smarter with mounted configs
+            self.config_present = False
+        cmap = client.V1ConfigMap()
+        cmap.metadata = client.V1ObjectMeta(name=f"{self.name}-config")
+        cmap.data = {}
+        cmap.data["startup-config"] = text
+        K8S.create_namespaced_config_map(namespace="default", body=cmap)
+
+    def unconfigure(self):
+        cmap = client.V1ConfigMap()
+        cmap.metadata = client.V1ObjectMeta(name="startup-config")
+        try:
+            K8S.delete_namespaced_config_map(name=f"{self.name}-config", namespace="default", body=cmap)
+        except:
+            LOG.debug(f'Failed to delete ConfigMap')
+
+    # Creates NodePort service for external access to pods
+    def create_service(self, inside, outside):
+        service = client.V1Service()
+        service.api_version = "v1"
+        service.kind = "Service"
+        service.metadata = client.V1ObjectMeta(name=f"service-{self.name}")
+        spec = client.V1ServiceSpec()
+        spec.selector = {"app": self.name}
+        spec.type = "NodePort"
+        port = client.V1ServicePort(
+            name=f"port-{outside}", 
+            protocol="TCP", 
+            port=outside, 
+            target_port=inside, 
+            node_port=outside
+            )
+        spec.ports = [port]
+        service.spec = spec
+        K8S.create_namespaced_service(namespace="default", body=service)
+
+    def delete_service(self):
+        try:
+            delete_options = client.V1DeleteOptions(api_version='v1',grace_period_seconds=0)
+            K8S.delete_namespaced_service(name=f"service-{self.name}", namespace="default", body=delete_options)
+        except:
+            LOG.debug(f'Failed to delete Service')
+
+
+    def expand_links(self):
+        for interface, link in self.interfaces.items():
+            full_link = dict()
+            full_link['uid']        = link.vni
+            full_link['local_intf'] = interface
+            full_link['local_ip']   = self.ips.get(interface, "")
+
+            my_endpoint = (self.name, interface, self.ips.get(interface, ""))
+            peer_endpoints = [x for x in link.endpoints if x != my_endpoint]
+            peer_name, peer_intf, peer_ip = peer_endpoints.pop(0)
+
+            full_link['peer_intf'] = peer_intf
+            full_link['peer_pod'] = peer_name
+            full_link['peer_ip']   = peer_ip
+            self.full_links.append(full_link)
+        return
+
+    def download_from_etcd(self, etcd_host, etcd_port):
+        etcd = etcd3.client(host=etcd_host, port=etcd_port)
+        result = etcd.get(f'/{self.name}/links')
+        LOG.debug(f"Received data from etcd /{self.name}/links: \n{result}")
+        return result
+
+    def upload_to_etcd(self, etcd_host, etcd_port):
+        if not self.full_links:
+            self.expand_links()
+        etcd = etcd3.client(host=etcd_host, port=etcd_port)
+        etcd.put(f'/{self.name}/links', json.dumps(self.full_links))
+        check = self.download_from_etcd(etcd_host, etcd_port)
+        LOG.debug(f'My full_links: {self.full_links}')
+        # If check[0] is not None
+        if check[0]:
+            return compare_links(json.loads(check[0].decode('utf-8')), self.full_links)
+        return False
+    
+    def delete_from_etcd(self, etcd_host, etcd_port):
+        etcd = etcd3.client(host=etcd_host, port=etcd_port)
+        etcd.delete(f'/{self.name}/links')
+        return self.download_from_etcd(etcd_host, etcd_port)[0] is None
+
+    def connect(self, interface, link):
+        LOG.debug(f'Creating a pointer to link {link.name} for {interface}@{self.name}')
+        self.interfaces[interface] = link
+        # register ourselves as one of link's endpoints
+        link.add_endpoint(self.name, interface, self.ips.get(interface, ""))
+        return
+
+    def create(self):
+        self.configure()
+        if not self.get():
+            container=client.V1Container(name=self.name)
+            container.image=self.image
+            container.command=self.command
+            container.env=self.environment
+            
+            sec_context = client.V1SecurityContext(privileged=True)
+            container.security_context = sec_context
+
+            volume_mount = client.V1VolumeMount(name="startup-config-volume", 
+                                                mount_path=os.path.join(self.conf_path, self.startup_file),
+                                                sub_path=self.startup_file)
+            if self.config_present:
+                container.volume_mounts = [volume_mount]
+
+            cmap = client.V1ConfigMapVolumeSource(name=f"{self.name}-config")
+            volume = client.V1Volume(name="startup-config-volume", config_map=cmap)
+            
+            spec=client.V1PodSpec(containers=[container])
+            if self.config_present:
+                spec.volumes=[volume]
+            spec.termination_grace_period_seconds = 0
+            pod=client.V1Pod()
+            pod.metadata=client.V1ObjectMeta(name=self.name, labels={"app": self.name})
+            pod.spec = spec
+            return K8S.create_namespaced_pod(namespace="default", body=pod)
+        return False
+    
+    def destroy(self):
+        self.unconfigure()
+        self.delete_service()
+        if self.get():
+            return K8S.delete_namespaced_pod(name=self.name, 
+                                               namespace="default", 
+                                               body=client.V1DeleteOptions(),
+                                               grace_period_seconds=0)
+        return False
+
+
+class CEOS(Device):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.image =  CEOS_IMAGE
+        self.command = ["/sbin/init"]
+        self.type = 'ceos'
+        # Extracing image tag
+        ceos_version = self.image.split("/")[-1].split(":")[-1]
+        # This assumes that docker image tag contains the correct EOS version, e.g. ceos:4.20.5
+        if ceos_version == "4.20.5F":
+            eos_platform = "ceossim"
+        else:
+            eos_platform = "ceoslab"
+        self.environment = [
+            {"name": "CEOS",                                "value": "1"},
+            {"name": "EOS_PLATFORM",                        "value": eos_platform},
+            {"name": "container",                           "value":"docker"},
+            {"name": "ETBA",                                "value": "1"},
+            {"name": "SKIP_ZEROTOUCH_BARRIER_IN_SYSDBINIT", "value": "1"},
+            {"name": "INTFTYPE",                            "value": "eth"}
+        ]
+        self.entry_cmd = f"kubectl exec -it {self.name} Cli"
+        self.conf_path = "/mnt/flash"
+        self.startup_file = "startup-config"
+                
+class Host(Device):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.image =  'alpine'
+        self.command =  ["/bin/sh", "-c", "sleep 2000000000000"]
+
+    @staticmethod
+    def  _verify_addr(ip):
+        prefix = netaddr.IPNetwork(ip)
+        return prefix.prefixlen < 32
+
+    def add_ip(self, ip, intf):
+        if self._verify_addr(ip):
+            self.ips[intf] = ip
+
+class Link(object):
+    def __init__(self, link_type, idx):
+        # Type is for future use, currently type is p2p
+        self.link_type = link_type
+        self.vni = idx
+        self.name = f'net-{idx}'
+        self.endpoints = list()
+        
+    def add_endpoint(self, name, interface, ip):
+        endpoint = (name, interface, ip)
+        self.endpoints.append(endpoint)
+
+def main():
+    # Initializing main variables
+    global CEOS_IMAGE, CONF_DIR, PUBLISH_BASE
+
+    # Assigning arguments
+    args    = parse_args()
+    debug   = args.debug
+    create  = args.create
+    destroy = args.destroy
+    t_file  = os.path.join(os.getcwd(), args.topology)
+    t_file_pwd = os.path.split(args.topology)[0]
+    destroy = args.destroy
+
+    # Logging settings
+    if debug:
+        log_level = logging.DEBUG
+    else:
+        log_level = logging.INFO
+    logging.basicConfig(level=log_level)
+
+    # Loading topology YAML file
+    with open(t_file, 'r') as stream:
+        t_yml = yaml.load(stream)
+    LOG.debug("Loaded topology from YAML file {}\n {}"
+                 .format(t_file, yaml.dump(t_yml)))
+    if 'links' not in t_yml:
+        LOG.info('"links" dictionary is not found in {}'
+                    .format(t_file))
+        return 1
+
+    # Overriding defaults
+    etcd_host = t_yml.get('etcd_host', os.getenv('ETCD_HOST', ETCD_HOST))
+    etcd_port = t_yml.get('etcd_port', os.getenv('ETCD_PORT', ETCD_PORT))
+    CEOS_IMAGE = t_yml.get('ceos_image', os.getenv('CEOS_IMAGE', CEOS_IMAGE))
+    CONF_DIR = t_yml.get('conf_dir', os.getenv('CONF_DIR', CONF_DIR))
+    PUBLISH_BASE = t_yml.get('publish_base', os.getenv('PUBLISH_BASE', PUBLISH_BASE))
+
+    # Update conf_dir to be relevant to topology file directory
+    CONF_DIR = os.path.join(t_file_pwd, CONF_DIR)
+
+    devices, links = parse_yaml(t_yml)
+
+    if create:
+        uploaded = [bool(device.upload_to_etcd(etcd_host, etcd_port)) for _,device in devices.items()]
+        if not all(uploaded):
+            LOG.info("Not all data has been uploaded to etcd")
+        else:
+            LOG.info("All data has been uploaded to etcd")
+
+        created = [bool(device.create()) for _,device  in devices.items()]
+        if not all(created):
+            LOG.info("Not all pods have been created")
+        else:
+            LOG.info("All pods have been created successfully")
+        
+        # Publishing external ports
+        ceos_only = [k for k in devices.keys() if devices[k].type == 'ceos']
+        base = int(PUBLISH_BASE)
+        for idx,name in enumerate(sorted(ceos_only)):
+            # Hard-coding this to 443 for now
+            devices[name].create_service(443,base+idx+443)
+
+        LOG.info(''.join([f"\nalias {name}='{device.entry_cmd}'" for (name, device) in devices.items()]))
+        
+    
+    elif destroy:
+        destroyed = [bool(device.destroy()) for _,device  in devices.items()]
+        if not all(destroyed):
+            LOG.info("Not all pods have been destroyed")
+        else:
+            LOG.info('All pods have been destroyed successfully')
+
+        LOG.info(''.join([f"\nunalias {name}" for name in devices.keys()]))
+
+        cleanup =  [bool(device.delete_from_etcd(etcd_host, etcd_port)) for _,device in devices.items()]
+        if not all(cleanup):
+            LOG.info("Not all data has been cleaned up in etcd")
+        else:
+            LOG.info('All data has been cleaned up from etcd')  
+
+    elif list:
+        running = [device.get() for _,device in devices.items() if len(device.get()) > 0]
+        #print(running)
+        print('\n'.join([f'{d[0].metadata.name}@{d[0].spec.node_name}' for d in running if d]))
+
+    return 0
+
+
+if __name__ == '__main__':
+    main()
