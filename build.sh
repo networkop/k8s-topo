@@ -1,4 +1,10 @@
+#!/usr/bin/env bash
 
-#!/bin/bash
+if [ "$#" -ne 1 ]; then
+    echo "Must provide docker hub username"
+    exit 1
+fi
+
 docker build -t k8s-topo .
-docker push k8s-topo
+docker tag k8s-topo $1/k8s-topo
+docker push $1/k8s-topo

@@ -3,6 +3,7 @@ Arbitray network topology builder for network simulations inside Kubernetes. Ana
 
 ## TODO
 
+0. Installation instructions
 1. Add more examples
 2. Add K8S setup/teardown instructions
 3. Add logging
