@@ -10,7 +10,28 @@ Arbitray network topology builder for network simulations inside Kubernetes. Ana
 4. Save/archive action for device configs
 5. Arbitrary port number publishing
 
+## Building a Docker image
+
+This script builds the docker image and pushes it to docker hub.
+
+```
+build.sh <dockerhub_username>
+```
+
+## Local Installation
+
+```
+pip install -r requirements.txt
+```
+
+## K8s-hosted installation
+
+```
+kubectl create -f kube-k8s-topo.yml
+```
+
 # Examples 
+
 ## Prerequisites
 
 Working K8s cluster with meshnet-CNI and externally accessible private etcd cluster. Refer to [meshnet-cni][meshnet-cni] for setup scripts.
