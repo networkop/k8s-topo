@@ -13,7 +13,5 @@ RUN apk add --no-cache python3 build-base python3-dev openssl-dev libffi-dev lib
     rm -r /root/.cache && \
     rm -rf /var/cache/apk/*
 
-
-
 CMD ["/bin/sh", "-c", "while sleep 3600; do :; done"]
 

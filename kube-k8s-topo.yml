@@ -5,6 +5,10 @@ metadata:
   labels:
     app: k8s-topo
 spec:
+  terminationGracePeriodSeconds: 0
+  hostNetwork: true
+  nodeSelector:
+    node-role.kubernetes.io/master: "true"
   containers:
   - name: k8s-topo
     image: networkop/k8s-topo
