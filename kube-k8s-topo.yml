@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: k8s-topo
+  labels:
+    app: k8s-topo
+spec:
+  containers:
+  - name: k8s-topo
+    image: networkop/k8s-topo
