@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+
+import argparse
+import random
+import os
+import string
+import yaml
+import random
+
+class Device(object):
+
+    def __init__(self, idx):
+        self.name = f'sw-{idx+1}'
+        self.idx = idx
+        self.intf_num = 1
+        self.peers = dict()
+
+
+    def get_next_intf(self):
+        intf_name = f'eth{self.intf_num}'
+        self.intf_num += 1
+        return intf_name 
+
+    def connect(self, peer, link_prefix):
+        my_intf = self.get_next_intf()
+        peer_intf = peer.get_next_intf()
+        self.peers[my_intf] = {
+            "peer_name": peer.name,
+            "peer_intf": peer_intf,
+            "link_prefix": link_prefix
+        }    
+        peer.peers[peer_intf] = {
+            "peer_name": self.name,
+            "peer_intf": my_intf,
+            "link_prefix": link_prefix
+        }
+        return my_intf, peer_intf
+
+    def generate_config(self):
+        my_idx = self.name.split('-')[-1]
+        hostname = ["!", f"hostname {self.name}", "!"]
+        ospf = ["ip routing", "!",
+        "router ospf 1", 
+        "   network 0.0.0.0 255.255.255.255 area 0",
+        "   maximum-paths 1",
+        "   exit",
+        "!"]
+        loopback = ["interface Loopback0",
+        f"   ip address 198.51.100.{my_idx}/32",
+        "   exit",
+        "!"]
+        interfaces = []
+        for my_intf,link in self.peers.items():
+            interfaces.append(f"interface {my_intf}")
+            interfaces.append(f"   ip address {link['link_prefix']}.{my_idx}/24")
+            interfaces.append("   no switchport")
+            interfaces.append("   exit")
+            interfaces.append("!")
+        return '\n'.join(hostname + ospf + loopback + interfaces)
+ 
+
+def write_file(filename, text):
+    with open(filename, 'w') as f:
+        f.write(text)
+    
+def parse_args():
+    parser = argparse.ArgumentParser(description="Example full-mesh OSPF topology builder for k8s-topo")
+    parser.add_argument(
+        "num",
+        help='Number of nodes',
+        type=int
+    )
+    parser.add_argument(                                                                             
+        "extra",                                                                                       
+        help='Number of extra links (in addition to the NUM-1 minimal number of links)',                                                                      
+        type=int
+    )                         
+    args = parser.parse_args()
+    return args
+
+def main():
+
+    # Assigning arguments
+    args = parse_args()
+    num  = args.num
+    extra = args.extra
+    max_links = num * (num - 1) / 2
+    if num > 99:
+        print("Maximum number of nodes cannot exceed 99")
+        exit(0)
+    # Setting defaults
+    cwd = os.getcwd()
+
+    # Generate topology name and create conf_dir
+    random_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    random_name = "TEST"
+    conf_dir = os.path.join(cwd, f"CONF-{random_name}")
+    os.makedirs(conf_dir, exist_ok=True)
+
+    # Initialise ip_links dict
+    ip_links = dict()
+
+    # Initialise list of devices
+    devices = [Device(x) for x in range(num)]
+    S = set([d.idx for d in devices])
+    T = set([])
+    my_idx = random.sample(S, 1).pop()
+    S.remove(my_idx)
+    T.add(my_idx)
+    
+    # Building a graph using a random walk
+    while S:
+        peer_device = random.sample(devices, 1).pop()
+        peer_idx = peer_device.idx
+        if peer_idx not in T:
+            my_device = devices[my_idx]
+
+            link_num = sorted((str(my_idx+1), str(peer_idx+1)))   
+            link_prefix = f"10.{link_num[0]}.{link_num[1]}"   
+
+            my_intf, peer_intf =my_device.connect(peer_device, link_prefix)
+
+            link = ip_links.get(link_prefix, set())
+            link.add(f"{my_device.name}:{my_intf}")
+            link.add(f"{peer_device.name}:{peer_intf}")
+            ip_links[link_prefix] = link
+
+            S.remove(peer_idx)
+            T.add(peer_idx)
+        my_idx = peer_idx
+
+    num_links = len(ip_links)
+    print(num_links)
+
+    # Addint extra links
+    while len(ip_links) < num_links + extra - 1:
+        if len(ip_links) >= max_links:
+            print("Reached maximum number of links")
+            break
+        my_device, peer_device = random.sample(devices, 2)
+        link_num = sorted((str(my_device.idx+1), str(peer_device.idx+1)))   
+        link_prefix = f"10.{link_num[0]}.{link_num[1]}"   
+        if link_prefix in ip_links:
+            continue
+        my_intf, peer_intf =my_device.connect(peer_device, link_prefix)
+        link = ip_links.get(link_prefix, set())
+        link.add(f"{my_device.name}:{my_intf}")
+        link.add(f"{peer_device.name}:{peer_intf}")
+        ip_links[link_prefix] = link
+
+    # Generate configs
+    for device in devices:
+        write_file(os.path.join(conf_dir,device.name), device.generate_config())
+
+ 
+
+    # Generate topology file
+    topology = dict()
+    topology['etcd_port'] = 32379
+    topology['conf_dir'] = f"./CONF-{random_name}"
+    topology['ceos_image'] = "10.233.60.91:5000/ceos:4.20.5F"
+    topology['links'] = [{"endpoints": sorted(list(v)) } for _,v in ip_links.items() if len(v) == 2]
+    write_file(f"{random_name}.yml",yaml.dump(topology))
+    print(f"Total number of links generated: {len(topology['links'])}")
+
+
+if __name__ == '__main__':
+    main()
+
