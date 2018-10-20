@@ -455,9 +455,12 @@ def main():
             if not(all(running)):
                 time.sleep(1)
             else:
-                LOG.info("All pods are running, enabling ip forwarding inside cEOS")
-                print([device.enable_ip_forwarding() for  _,device in devices.items() if device.type == 'ceos'])
-                break
+                LOG.info("All pods are running, trying to enable ip forwarding for cEOS pods")
+                expected = 'net.ipv4.ip_forward = 1'
+                enabled = [device.enable_ip_forwarding() == expected for  _,device in devices.items() if device.type == 'ceos']
+                if all(enabled):
+                    LOG.info("All cEOS pods have IP forwarding enabled")
+                    break
     return 0
 
 
