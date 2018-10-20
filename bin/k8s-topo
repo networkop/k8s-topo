@@ -8,6 +8,7 @@ import etcd3
 import json
 from kubernetes import client, config
 from kubernetes.stream import stream
+import time
 
 
 # Initialise logging
@@ -23,6 +24,8 @@ ETCD_PORT = 2379
 CEOS_IMAGE = 'ceos:latest'
 CONF_DIR = './config'
 PUBLISH_BASE = 30000
+ENABLE_IP_FORWARDING = True
+WAIT_FOR_RUNNING = 10
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Tool to create network topologies inside k8s")
@@ -135,6 +138,7 @@ class Device(object):
         self.ips = dict()
         self.entry_cmd = f"kubectl exec -it {self.name} sh"
         self.config_present = True
+        self.namespace = 'default'
         # pointer to a k8s pod
         self.pod = None
         # Path to mount configuration files
@@ -142,7 +146,8 @@ class Device(object):
         self.startup_file = "config"
     
     def get(self):
-        return K8S.list_namespaced_pod(namespace="default", field_selector=f"metadata.name={self.name}").items
+        return K8S.list_namespaced_pod(namespace=self.namespace, 
+                                       field_selector=f"metadata.name={self.name}").items
 
     def configure(self, text=""):
         startup = os.path.join(CONF_DIR, self.name)
@@ -156,13 +161,14 @@ class Device(object):
         cmap.metadata = client.V1ObjectMeta(name=f"{self.name}-config")
         cmap.data = {}
         cmap.data["startup-config"] = text
-        K8S.create_namespaced_config_map(namespace="default", body=cmap)
+        K8S.create_namespaced_config_map(namespace=self.namespace, body=cmap)
 
     def unconfigure(self):
         cmap = client.V1ConfigMap()
         cmap.metadata = client.V1ObjectMeta(name="startup-config")
         try:
-            K8S.delete_namespaced_config_map(name=f"{self.name}-config", namespace="default", body=cmap)
+            K8S.delete_namespaced_config_map(name=f"{self.name}-config", 
+                                             namespace=self.namespace, body=cmap)
         except:
             LOG.debug(f'Failed to delete ConfigMap')
 
@@ -184,18 +190,24 @@ class Device(object):
             )
         spec.ports = [port]
         service.spec = spec
-        K8S.create_namespaced_service(namespace="default", body=service)
+        K8S.create_namespaced_service(namespace=self.namespace, body=service)
 
     def delete_service(self):
         try:
             delete_options = client.V1DeleteOptions(api_version='v1',grace_period_seconds=0)
-            K8S.delete_namespaced_service(name=f"service-{self.name}", namespace="default", body=delete_options)
+            K8S.delete_namespaced_service(name=f"service-{self.name}", namespace=self.namespace, 
+                                          body=delete_options)
         except:
             LOG.debug(f'Failed to delete Service')
 
     def _exec_command(self, command):
-        return stream(K8S.connect_get_namespaced_pod_exec, self.name, 'default', command=command,
-            stderr=True, stdin=True, stdout=True, tty=False)
+        return stream(K8S.connect_get_namespaced_pod_exec, self.name, 
+                      self.namespace, command=command, stderr=True, 
+                      stdin=True, stdout=True, tty=False)
+
+
+    def get_status(self):
+        return K8S.read_namespaced_pod_status(self.name, self.namespace).status.phase
 
     def enable_ip_forwarding(self):
         LOG.debug(f"Enabling ip forwarding for {self.name}")
@@ -274,9 +286,11 @@ class Device(object):
                 spec.volumes=[volume]
             spec.termination_grace_period_seconds = 0
             pod=client.V1Pod()
-            pod.metadata=client.V1ObjectMeta(name=self.name, labels={"app": self.name})
+            pod.metadata=client.V1ObjectMeta(name=self.name, 
+                                             labels={"app": self.name})
             pod.spec = spec
-            return K8S.create_namespaced_pod(namespace="default", body=pod)
+            return K8S.create_namespaced_pod(namespace=self.namespace, 
+                                             body=pod)
         return False
     
     def destroy(self):
@@ -284,9 +298,9 @@ class Device(object):
         self.delete_service()
         if self.get():
             return K8S.delete_namespaced_pod(name=self.name, 
-                                               namespace="default", 
-                                               body=client.V1DeleteOptions(),
-                                               grace_period_seconds=0)
+                                             namespace=self.namespace, 
+                                             body=client.V1DeleteOptions(),
+                                             grace_period_seconds=0)
         return False
 
 
@@ -397,7 +411,14 @@ def main():
         else:
             LOG.info("All pods have been created successfully")
 
-            [device.enable_ip_forwarding() for  _,device in devices.items() if device.type == 'ceos']
+            if ENABLE_IP_FORWARDING:
+                for i in range(WAIT_FOR_RUNNING):
+                    all_running = [device.get_status() == 'Running' for _, device in devices.items() if device.type == 'ceos']
+                    if not(all_running):
+                        time.sleep(1)
+                        continue
+                    else:
+                        [device.enable_ip_forwarding() for  _,device in devices.items() if device.type == 'ceos']
         
         # Publishing external ports
         ceos_only = [k for k in devices.keys() if devices[k].type == 'ceos']
