@@ -7,6 +7,8 @@ import os
 import etcd3
 import json
 from kubernetes import client, config
+from kubernetes.stream import stream
+
 
 # Initialise logging
 LOG = logging.getLogger(__name__)
@@ -191,6 +193,14 @@ class Device(object):
         except:
             LOG.debug(f'Failed to delete Service')
 
+    def _exec_command(self, command):
+        return stream(K8S.connect_get_namespaced_pod_exec, self.name, 'default', command=command,
+            stderr=True, stdin=True, stdout=True, tty=False)
+
+    def enable_ip_forwarding(self):
+        LOG.debug(f"Enabling ip forwarding for {self.name}")
+        command = ["bin/sh", "-c", "sysctl -w net.ipv4.ip_forward=1"]
+        return self._exec_command(command)
 
     def expand_links(self):
         for interface, link in self.interfaces.items():
@@ -386,6 +396,8 @@ def main():
             LOG.info("Not all pods have been created")
         else:
             LOG.info("All pods have been created successfully")
+
+            [device.enable_ip_forwarding() for  _,device in devices.items() if device.type == 'ceos']
         
         # Publishing external ports
         ceos_only = [k for k in devices.keys() if devices[k].type == 'ceos']
