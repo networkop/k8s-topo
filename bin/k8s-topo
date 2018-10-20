@@ -25,7 +25,7 @@ CEOS_IMAGE = 'ceos:latest'
 CONF_DIR = './config'
 PUBLISH_BASE = 30000
 ENABLE_IP_FORWARDING = True
-WAIT_FOR_RUNNING = 10
+WAIT_FOR_RUNNING = 20
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Tool to create network topologies inside k8s")
@@ -48,8 +48,13 @@ def parse_args():
         action="store_true"
     )
     main_group.add_argument(
-        "--list",
+        "--show",
         help="Show running topology",
+        action="store_true"
+    )
+    main_group.add_argument(
+        "--eif",
+        help="Enable ip forwarding for cEOS devices",
         action="store_true"
     )
 
@@ -365,9 +370,10 @@ def main():
     debug   = args.debug
     create  = args.create
     destroy = args.destroy
+    show    = args.show
+    eif     = args.eif
     t_file  = os.path.join(os.getcwd(), args.topology)
     t_file_pwd = os.path.split(args.topology)[0]
-    destroy = args.destroy
 
     # Logging settings
     if debug:
@@ -411,14 +417,6 @@ def main():
         else:
             LOG.info("All pods have been created successfully")
 
-            if ENABLE_IP_FORWARDING:
-                for i in range(WAIT_FOR_RUNNING):
-                    all_running = [device.get_status() == 'Running' for _, device in devices.items() if device.type == 'ceos']
-                    if not(all_running):
-                        time.sleep(1)
-                        continue
-                    else:
-                        [device.enable_ip_forwarding() for  _,device in devices.items() if device.type == 'ceos']
         
         # Publishing external ports
         ceos_only = [k for k in devices.keys() if devices[k].type == 'ceos']
@@ -445,11 +443,21 @@ def main():
         else:
             LOG.info('All data has been cleaned up from etcd')  
 
-    elif list:
+    elif show:
         running = [device.get() for _,device in devices.items() if len(device.get()) > 0]
         #print(running)
         print('\n'.join([f'{d[0].metadata.name}@{d[0].spec.node_name}' for d in running if d]))
 
+    # Enabling IP forwarding inside cEOS
+    elif eif:
+        for _ in range(WAIT_FOR_RUNNING):
+            running = [device.get_status() == 'Running' for _, device in devices.items() if device.type == 'ceos']
+            if not(all(running)):
+                time.sleep(1)
+            else:
+                LOG.info("All pods are running, enabling ip forwarding inside cEOS")
+                print([device.enable_ip_forwarding() for  _,device in devices.items() if device.type == 'ceos'])
+                break
     return 0
 
 
