@@ -278,12 +278,13 @@ class Device(object):
     def create(self):
         self.configure()
         if not self.get():
-            container=client.V1Container(name=self.name)
-            container.image=self.image
-            container.command=self.command
-            container.env=self.environment
+            container         = client.V1Container(name=self.name)
+            container.image   = self.image
+            container.command = self.command
+            container.args    = self.args
+            container.env     = self.environment
             
-            sec_context = client.V1SecurityContext(privileged=True)
+            sec_context                = client.V1SecurityContext(privileged=True)
             container.security_context = sec_context
 
             volume_mount = client.V1VolumeMount(name="startup-config-volume", 
@@ -292,7 +293,7 @@ class Device(object):
             if self.config_present:
                 container.volume_mounts = [volume_mount]
 
-            cmap = client.V1ConfigMapVolumeSource(name=f"{self.name}-config")
+            cmap   = client.V1ConfigMapVolumeSource(name=f"{self.name}-config")
             volume = client.V1Volume(name="startup-config-volume", config_map=cmap)
             
             spec=client.V1PodSpec(containers=[container])
