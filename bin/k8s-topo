@@ -144,8 +144,8 @@ class Device(object):
         self.type = ''
         self.interfaces = dict()
         self.ips = dict()
-        self.environment = dict()
         self.command = list()
+        self.args = list()
         self.image = ''
         self.environment = []
         self.full_links = list()
@@ -362,9 +362,9 @@ class Host(Device):
 class Quagga(Device):
     def __init__(self, idx, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image =  'networkop/quagga'
+        self.image =  'networkop/qrtr'
         # Device index will be used in loopback ip a ddress
-        self.command = idx
+        self.args = [f"{idx}"]
 
     @staticmethod
     def  _verify_addr(ip):
