@@ -11,9 +11,9 @@ fi
 touch /etc/quagga/zebra.conf
 /usr/sbin/zebra -d -f /etc/quagga/zebra.conf
 
+ip add add 198.51.100.$IDX/32 dev lo
+
 cat << EOF >> /etc/quagga/ospf.conf
-interface lo0
-  ip address 198.51.100.$IDX
 !
 router ospf
  network 0.0.0.0/0 area 0.0.0.0
@@ -21,4 +21,4 @@ router ospf
 EOF
 
 # Starting OSPF daemon
-/usr/sbin/ospfd -d -f /etc/quagga/ospf.conf
+/usr/sbin/ospfd -f /etc/quagga/ospf.conf

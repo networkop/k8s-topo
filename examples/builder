@@ -127,9 +127,12 @@ def main():
 
             my_intf, peer_intf =my_device.connect(peer_device, link_prefix)
 
+            my_ip = f"{link_prefix}.{my_idx+1}/24"
+            peer_ip = f"{link_prefix}.{peer_idx+1}/24"
+
             link = ip_links.get(link_prefix, set())
-            link.add(f"{my_device.name}:{my_intf}")
-            link.add(f"{peer_device.name}:{peer_intf}")
+            link.add(f"{my_device.name}:{my_intf}:{my_ip}")
+            link.add(f"{peer_device.name}:{peer_intf}:{peer_ip}")
             ip_links[link_prefix] = link
 
             S.remove(peer_idx)
