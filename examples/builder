@@ -9,8 +9,8 @@ import random
 
 class Device(object):
 
-    def __init__(self, idx):
-        self.name = f'sw-{idx+1}'
+    def __init__(self, idx, prefix='sw'):
+        self.name = f'{prefix}-{idx+1}'
         self.idx = idx
         self.intf_num = 1
         self.peers = dict()
@@ -74,7 +74,13 @@ def parse_args():
         "extra",                                                                                       
         help='Number of extra links (in addition to the NUM-1 minimal number of links)',                                                                      
         type=int
-    )                         
+    )   
+    parser.add_argument(                                                                             
+        "--prefix",                                                                                       
+        help='Device hostname prefix',
+        type=str,
+        default='sw'                                                                   
+    )                          
     args = parser.parse_args()
     return args
 
@@ -84,6 +90,7 @@ def main():
     args = parse_args()
     num  = args.num
     extra = args.extra
+    prefix = args.prefix
     max_links = num * (num - 1) / 2
     if num > 99:
         print("Maximum number of nodes cannot exceed 99")
@@ -101,7 +108,7 @@ def main():
     ip_links = dict()
 
     # Initialise list of devices
-    devices = [Device(x) for x in range(num)]
+    devices = [Device(x, prefix=prefix) for x in range(num)]
     S = set([d.idx for d in devices])
     T = set([])
     my_idx = random.sample(S, 1).pop()
