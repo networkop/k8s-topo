@@ -15,7 +15,7 @@ var svg = d3.select("body").append("svg")
     .attr("width", width)
     .attr("height", height);
 
-d3.json("RANDTOPO.json", function(error, graph) {
+d3.json("graph.json", function(error, graph) {
 
   var linkNodes = [];
 
@@ -112,10 +112,10 @@ d3.json("RANDTOPO.json", function(error, graph) {
         });
         // also style link accordingly
         link.style("stroke-opacity", function(o) {
-            return isConnected(d, o.source) && isConnected(d, o.target) ? 1 : opacity;
+            return o.source === d || o.target === d ? 1 : opacity;
         });
         link.style("stroke", function(o){
-            return isConnected(d, o.source) && isConnected(d, o.target) ? o.source.colour : "#ddd";
+            return o.source === d || o.target === d ? o.source.colour : "#ddd";
         });
     };
   }
