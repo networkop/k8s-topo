@@ -5,7 +5,9 @@ import random
 import os
 import string
 import yaml
+import json
 import random
+import networkx as nx
 
 class Device(object):
 
@@ -42,7 +44,6 @@ class Device(object):
         ospf = ["ip routing", "!",
         "router ospf 1", 
         "   network 0.0.0.0 255.255.255.255 area 0",
-        "   maximum-paths 1",
         "   exit",
         "!"]
         loopback = ["interface Loopback0",
@@ -72,14 +73,14 @@ def parse_args():
     )
     parser.add_argument(                                                                             
         "extra",                                                                                       
-        help='Number of extra links (in addition to the NUM-1 minimal number of links)',                                                                      
+        help='Number of extra links (in addition to the min NUM-1 number of links)',                                                                      
         type=int
     )   
     parser.add_argument(                                                                             
         "--prefix",                                                                                       
         help='Device hostname prefix',
         type=str,
-        default='sw'                                                                   
+        default='qrtr'                                                                   
     )                          
     args = parser.parse_args()
     return args
@@ -89,23 +90,28 @@ def main():
     # Assigning arguments
     args = parse_args()
     num  = args.num
+    if num>250:
+        print("Number of nodes cannot exceed 250")
+        exit(0)
     extra = args.extra
     prefix = args.prefix
     max_links = num * (num - 1) / 2
-    if num > 99:
-        print("Maximum number of nodes cannot exceed 99")
+    if num+extra > max_links+1:
+        print(f"Total number of nodes cannot exceed {max_links}")
         exit(0)
     # Setting defaults
     cwd = os.getcwd()
 
     # Generate topology name and create conf_dir
-    random_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    random_name = "TEST"
+    random_name = "RANDTOPO"
     conf_dir = os.path.join(cwd, f"CONF-{random_name}")
     os.makedirs(conf_dir, exist_ok=True)
 
     # Initialise ip_links dict
     ip_links = dict()
+
+    # Initialise networkX graph
+    g = nx.Graph()
 
     # Initialise list of devices
     devices = [Device(x, prefix=prefix) for x in range(num)]
@@ -114,7 +120,11 @@ def main():
     my_idx = random.sample(S, 1).pop()
     S.remove(my_idx)
     T.add(my_idx)
+
+    # Initialise networkX nodes
+    g.add_nodes_from([(d.idx, dict(name=d.name)) for d in devices])
     
+
     # Building a graph using a random walk
     while S:
         peer_device = random.sample(devices, 1).pop()
@@ -135,15 +145,18 @@ def main():
             link.add(f"{peer_device.name}:{peer_intf}:{peer_ip}")
             ip_links[link_prefix] = link
 
+            # Updating networkX graph
+            g.add_edge(my_device.idx, peer_device.idx, value=1)
+            g.add_edge(peer_device.idx, my_device.idx, value=1)
+
             S.remove(peer_idx)
             T.add(peer_idx)
         my_idx = peer_idx
 
     num_links = len(ip_links)
-    print(num_links)
 
-    # Addint extra links
-    while len(ip_links) < num_links + extra - 1:
+    # Adding extra links
+    while len(ip_links) < num_links + extra:
         if len(ip_links) >= max_links:
             print("Reached maximum number of links")
             break
@@ -153,18 +166,26 @@ def main():
         if link_prefix in ip_links:
             continue
         my_intf, peer_intf =my_device.connect(peer_device, link_prefix)
-        my_ip = f"{link_prefix}.{my_idx+1}/24"
-        peer_ip = f"{link_prefix}.{peer_idx+1}/24"
+        my_ip = f"{link_prefix}.{my_device.idx+1}/24"
+        peer_ip = f"{link_prefix}.{peer_device.idx+1}/24"
         link = ip_links.get(link_prefix, set())
         link.add(f"{my_device.name}:{my_intf}:{my_ip}")
         link.add(f"{peer_device.name}:{peer_intf}:{peer_ip}")
+        # Updating networkX graph
+        g.add_edge(my_device.idx, peer_device.idx, value=1)
+        g.add_edge(peer_device.idx, my_device.idx, value=1)
         ip_links[link_prefix] = link
 
     # Generate configs
     for device in devices:
         write_file(os.path.join(conf_dir,device.name), device.generate_config())
 
- 
+    # Grouping networkX graph
+    from networkx.algorithms import community
+    groups = {name: idx for idx,c in enumerate(community.greedy_modularity_communities(g)) for name in c}   
+    nx.set_node_attributes(g,  groups, "group")
+    from networkx.readwrite import json_graph
+    #print(json_graph.node_link_data(g))
 
     # Generate topology file
     topology = dict()
@@ -174,6 +195,9 @@ def main():
     topology['links'] = [{"endpoints": sorted(list(v)) } for _,v in ip_links.items() if len(v) == 2]
     write_file(f"{random_name}.yml",yaml.dump(topology))
     print(f"Total number of links generated: {len(topology['links'])}")
+
+    # Generate D3.js JSON graph
+    write_file(f"{random_name}.json", json.dumps(json_graph.node_link_data(g), indent=2))
 
 
 if __name__ == '__main__':

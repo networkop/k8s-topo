@@ -10,7 +10,12 @@ build.sh <dockerhub_username>
 
 ## Create
 
+```
+docker run -d --rm --cap-add=NET_ADMIN --name quagga qrtr
+```
+
+## Connect
 
 ```
-docker run -d --rm --cap-add=NET_ADMIN qrtr
+docker exec -it quagga vtysh
 ```

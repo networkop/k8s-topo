@@ -10,7 +10,13 @@ Arbitray network topology builder for network simulations inside Kubernetes. Ana
 4. Save/archive action for device configs
 5. Arbitrary port number publishing
 
-## Building a Docker image
+## Installation
+
+### Local installation
+
+```
+pip install -r requirements.txt
+```
 
 This script builds the docker image and pushes it to docker hub.
 

@@ -1,0 +1,119 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "name": "qrtr-1",
+      "group": 0,
+      "id": 0
+    },
+    {
+      "name": "qrtr-2",
+      "group": 1,
+      "id": 1
+    },
+    {
+      "name": "qrtr-3",
+      "group": 0,
+      "id": 2
+    },
+    {
+      "name": "qrtr-4",
+      "group": 1,
+      "id": 3
+    },
+    {
+      "name": "qrtr-5",
+      "group": 0,
+      "id": 4
+    },
+    {
+      "name": "qrtr-6",
+      "group": 2,
+      "id": 5
+    },
+    {
+      "name": "qrtr-7",
+      "group": 0,
+      "id": 6
+    },
+    {
+      "name": "qrtr-8",
+      "group": 2,
+      "id": 7
+    },
+    {
+      "name": "qrtr-9",
+      "group": 1,
+      "id": 8
+    },
+    {
+      "name": "qrtr-10",
+      "group": 1,
+      "id": 9
+    }
+  ],
+  "links": [
+    {
+      "value": 1,
+      "source": 0,
+      "target": 4
+    },
+    {
+      "value": 1,
+      "source": 0,
+      "target": 2
+    },
+    {
+      "value": 1,
+      "source": 1,
+      "target": 9
+    },
+    {
+      "value": 1,
+      "source": 1,
+      "target": 3
+    },
+    {
+      "value": 1,
+      "source": 2,
+      "target": 7
+    },
+    {
+      "value": 1,
+      "source": 2,
+      "target": 6
+    },
+    {
+      "value": 1,
+      "source": 2,
+      "target": 8
+    },
+    {
+      "value": 1,
+      "source": 3,
+      "target": 7
+    },
+    {
+      "value": 1,
+      "source": 3,
+      "target": 8
+    },
+    {
+      "value": 1,
+      "source": 4,
+      "target": 6
+    },
+    {
+      "value": 1,
+      "source": 5,
+      "target": 7
+    },
+    {
+      "value": 1,
+      "source": 8,
+      "target": 9
+    }
+  ]
+}

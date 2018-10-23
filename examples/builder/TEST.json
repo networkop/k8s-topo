@@ -1,0 +1,54 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "name": "qrtr-1",
+      "group": 1,
+      "id": 0
+    },
+    {
+      "name": "qrtr-2",
+      "group": 0,
+      "id": 1
+    },
+    {
+      "name": "qrtr-3",
+      "group": 1,
+      "id": 2
+    },
+    {
+      "name": "qrtr-4",
+      "group": 0,
+      "id": 3
+    },
+    {
+      "name": "qrtr-5",
+      "group": 0,
+      "id": 4
+    }
+  ],
+  "links": [
+    {
+      "value": 1,
+      "source": 0,
+      "target": 2
+    },
+    {
+      "value": 1,
+      "source": 1,
+      "target": 3
+    },
+    {
+      "value": 1,
+      "source": 2,
+      "target": 3
+    },
+    {
+      "value": 1,
+      "source": 3,
+      "target": 4
+    }
+  ]
+}
