@@ -9,6 +9,8 @@ import json
 from kubernetes import client, config
 from kubernetes.stream import stream
 import time
+import networkx as nx
+from networkx.readwrite import json_graph
 
 
 # Initialise logging
@@ -55,6 +57,11 @@ def parse_args():
     main_group.add_argument(
         "--eif",
         help="Enable ip forwarding for cEOS devices",
+        action="store_true"
+    )
+    main_group.add_argument(
+        "--test",
+        help="Flag for testing",
         action="store_true"
     )
 
@@ -136,6 +143,33 @@ def compare_links(received,stored):
     # Returning True if delta is not set([])
     return not bool(delta)
 
+def write_file(filename, text):
+    cwd = os.path.dirname(os.path.realpath(__file__))
+    filepath = os.path.join(cwd, filename)
+    with open(filepath, 'w') as f:
+        f.write(text)
+
+def create_d3_graph(devices, links):
+    g = nx.Graph()
+    devices_running = [device.get() for _,device in devices.items() if len(device.get()) > 0]
+    devices_sorted  = sorted([device for device,_ in devices.items()])
+    g.add_nodes_from([(devices_sorted.index(d), dict(name=d)) for d in devices_sorted])
+    [ g.add_edge(devices_sorted.index(link.endpoints[0][0]),
+                 devices_sorted.index(link.endpoints[1][0]), 
+                 value=1) 
+                 for link in links if len(link.endpoints) == 2 ]
+    device_nodes = {d[0].metadata.name: d[0].spec.node_name for d in devices_running if d}
+    # faking device nodes
+    #device_nodes = {'host-1': 'node1', 'host-2': 'node1', 'host-3': 'node3'}
+    unique_nodes = sorted(list(set(device_nodes.values())))
+    groups = {devices_sorted.index(device): unique_nodes.index(node) for device, node in device_nodes.items()}
+    nx.set_node_attributes(g,  groups, "group")
+    #print(json_graph.node_link_data(g))
+    cwd = os.getcwd()
+    filepath = os.path.join(cwd, "web/graph.json")
+    with open(filepath, 'w') as f:
+        f.write(json.dumps(json_graph.node_link_data(g), indent=2))
+
 
 class Device(object):
     def __init__(self, name):
@@ -148,7 +182,6 @@ class Device(object):
         self.image = ''
         self.environment = []
         self.full_links = list()
-        self.ips = dict()
         self.entry_cmd = f"kubectl exec -it {self.name} sh"
         self.config_present = True
         self.namespace = 'default'
@@ -400,6 +433,7 @@ def main():
     create  = args.create
     destroy = args.destroy
     show    = args.show
+    test    = args.test
     eif     = args.eif
     t_file  = os.path.join(os.getcwd(), args.topology)
     t_file_pwd = os.path.split(args.topology)[0]
@@ -456,6 +490,9 @@ def main():
 
         LOG.info(''.join([f"\nalias {name}='{device.entry_cmd}'" for (name, device) in devices.items()]))
         
+        # Creating d3 graph
+        create_d3_graph(devices, links)
+        LOG.info("D3 graph created")
     
     elif destroy:
         destroyed = [bool(device.destroy()) for _,device  in devices.items()]
@@ -490,6 +527,9 @@ def main():
                 if all(enabled):
                     LOG.info("All cEOS pods have IP forwarding enabled")
                     break
+    elif test:
+        create_d3_graph(devices, links)
+    
     return 0
 
 

@@ -9,11 +9,14 @@ RUN apk add --no-cache python3 build-base python3-dev openssl-dev libffi-dev lib
     rm -r /usr/lib/python*/ensurepip && \
     pip3 install --upgrade pip setuptools && \
     pip3 install -r requirements.txt && \
+    pip3 install -r examples/builder/requirements.txt && \
     apk del build-base python3-dev openssl-dev libffi-dev && \ 
     rm -r /root/.cache && \
     rm -rf /var/cache/apk/*
 
-RUN cp examples/builder/nginx.conf /etc/nginx/conf.d/default.conf
+COPY examples/builder/nginx.conf /etc/nginx/conf.d/default.conf
+
+RUN mkdir -p /run/nginx
 
 EXPOSE 80
 

@@ -18,15 +18,6 @@ optional arguments:
   --prefix PREFIX  Device hostname prefix
 ```
 
-## Visualisation
-
-The script generates a D3-compliant JSON that is rendered by d3.js in index.html. To view the result do:
-
-```
-firefox index.html
-```
-
-
 ## Examples
 
 ### 5-node topology 
@@ -39,9 +30,6 @@ This will generate a uniform spanning tree using a random walk algorithm. The nu
 
 This may result in the following topology:
 
-```
-firefox index.html
-```
 
 ![5-node](5node.png)
 

@@ -7,7 +7,6 @@ import string
 import yaml
 import json
 import random
-import networkx as nx
 
 class Device(object):
 
@@ -112,8 +111,6 @@ def main():
     # Initialise ip_links dict
     ip_links = dict()
 
-    # Initialise networkX graph
-    g = nx.Graph()
 
     # Initialise list of devices
     devices = [Device(x, prefix=prefix) for x in range(num)]
@@ -123,8 +120,6 @@ def main():
     S.remove(my_idx)
     T.add(my_idx)
 
-    # Initialise networkX nodes
-    g.add_nodes_from([(d.idx, dict(name=d.name)) for d in devices])
     
 
     # Building a graph using a random walk
@@ -146,10 +141,6 @@ def main():
             link.add(f"{my_device.name}:{my_intf}:{my_ip}")
             link.add(f"{peer_device.name}:{peer_intf}:{peer_ip}")
             ip_links[link_prefix] = link
-
-            # Updating networkX graph
-            g.add_edge(my_device.idx, peer_device.idx, value=1)
-            g.add_edge(peer_device.idx, my_device.idx, value=1)
 
             S.remove(peer_idx)
             T.add(peer_idx)
@@ -173,21 +164,11 @@ def main():
         link = ip_links.get(link_prefix, set())
         link.add(f"{my_device.name}:{my_intf}:{my_ip}")
         link.add(f"{peer_device.name}:{peer_intf}:{peer_ip}")
-        # Updating networkX graph
-        g.add_edge(my_device.idx, peer_device.idx, value=1)
-        g.add_edge(peer_device.idx, my_device.idx, value=1)
         ip_links[link_prefix] = link
 
     # Generate configs
     for device in devices:
         write_file(os.path.join(conf_dir,device.name), device.generate_config())
-
-    # Grouping networkX graph
-    from networkx.algorithms import community
-    groups = {name: idx for idx,c in enumerate(community.greedy_modularity_communities(g)) for name in c}   
-    nx.set_node_attributes(g,  groups, "group")
-    from networkx.readwrite import json_graph
-    #print(json_graph.node_link_data(g))
 
     # Generate topology file
     topology = dict()
@@ -197,8 +178,6 @@ def main():
     write_file(f"{random_name}.yml",yaml.dump(topology))
     print(f"Total number of links generated: {len(topology['links'])}")
 
-    # Generate D3.js JSON graph
-    write_file(f"{random_name}.json", json.dumps(json_graph.node_link_data(g), indent=2))
 
 
 if __name__ == '__main__':
