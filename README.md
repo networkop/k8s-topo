@@ -10,6 +10,7 @@ Arbitray network topology builder for network simulations inside Kubernetes. Ana
 4. Save/archive action for device configs
 5. Arbitrary port number publishing
 6. Add visualisation explanation
+7. Create correlation between node name and index
 
 ## Local installation
 

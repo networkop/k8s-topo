@@ -54,7 +54,7 @@ d3.json("graph.json", function(error, graph) {
 
   var labels = node.append("text")
       .text(function(d) {
-        return d.id+1;
+        return d.name;
       })
       .attr('x', 9)
       .attr('y', 3);
