@@ -1,4 +1,19 @@
 apiVersion: v1
+kind: Service
+metadata:
+  name: k8s-topo-service
+  labels:
+    run: k8s-topo-service
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+  selector:
+    app: k8s-topo
+
+---
+
+apiVersion: v1
 kind: Pod
 metadata:
   name: k8s-topo
@@ -13,3 +28,5 @@ spec:
   - name: k8s-topo
     image: networkop/k8s-topo
     imagePullPolicy: Always
+    ports:
+      - containerPort: 80

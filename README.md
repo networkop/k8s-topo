@@ -127,12 +127,12 @@ Generate a ranom 200-node network topology 199 links
 Total number of links generated: 199
 ```
 
-Create the topology 
+Create the topology (takes about 20 seconds)
 
 ```
 ./bin/k8s-topo --create examples/builder/RANDTOPO.yml
 ```
 
-```
+
 
 [meshnet-cni]: https://github.com/networkop/meshnet-cni
