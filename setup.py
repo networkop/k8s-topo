@@ -23,3 +23,4 @@ setup(
     author='Michael Kashin',
     author_email='mkashin@arista.com',
     description='K8s network topology builder'
+)
