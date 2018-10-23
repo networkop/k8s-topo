@@ -61,7 +61,9 @@ class Device(object):
  
 
 def write_file(filename, text):
-    with open(filename, 'w') as f:
+    cwd = os.path.dirname(os.path.realpath(__file__))
+    filepath = os.path.join(cwd, filename)
+    with open(filepath, 'w') as f:
         f.write(text)
     
 def parse_args():
@@ -100,7 +102,7 @@ def main():
         print(f"Total number of nodes cannot exceed {max_links}")
         exit(0)
     # Setting defaults
-    cwd = os.getcwd()
+    cwd = cwd = os.path.dirname(os.path.realpath(__file__))
 
     # Generate topology name and create conf_dir
     random_name = "RANDTOPO"
@@ -191,7 +193,6 @@ def main():
     topology = dict()
     topology['etcd_port'] = 32379
     topology['conf_dir'] = f"./CONF-{random_name}"
-    topology['ceos_image'] = "10.233.60.91:5000/ceos:4.20.5F"
     topology['links'] = [{"endpoints": sorted(list(v)) } for _,v in ip_links.items() if len(v) == 2]
     write_file(f"{random_name}.yml",yaml.dump(topology))
     print(f"Total number of links generated: {len(topology['links'])}")

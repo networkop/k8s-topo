@@ -10,27 +10,24 @@ Arbitray network topology builder for network simulations inside Kubernetes. Ana
 4. Save/archive action for device configs
 5. Arbitrary port number publishing
 
-## Installation
 
-### Local installation
+## Local installation
+
+Make sure you've got python3-dev and build-essential/build-base packages installed and then do
 
 ```
-pip install -r requirements.txt
+pip install git+https://github.com/networkop/k8s-topo.git
 ```
 
-This script builds the docker image and pushes it to docker hub.
+## Hosted K8s installation
+
+Build the docker image and push it to the docker hub.
 
 ```
 build.sh <dockerhub_username>
 ```
 
-## Local Installation
-
-```
-pip install -r requirements.txt
-```
-
-## K8s-hosted installation
+Update the image name in `kube-k8s-topo.yml` to match your dockerhub username and do:
 
 ```
 kubectl create -f kube-k8s-topo.yml
@@ -42,7 +39,7 @@ kubectl create -f kube-k8s-topo.yml
 
 Working K8s cluster with meshnet-CNI and externally accessible private etcd cluster. Refer to [meshnet-cni][meshnet-cni] for setup scripts.
 
-## Example 1 - 3-node alpine linux topology
+## 3-node alpine linux topology
 
 Topology definition file (alpine image is used whenever string `host` is matched in device name)
 
@@ -66,7 +63,7 @@ Destroy the topology
 ./bin/k8s-topo --destroy examples/3node-host.yml
 ```
 
-## Example 2 - 3-node cEOS topology
+## 3-node cEOS topology
 
 Topology definition file (cEOS is stored in a private Docker registry)
 
@@ -112,6 +109,30 @@ unalias sw-1
 unalias sw-2
 unalias sw-3
 INFO:__main__:All data has been cleaned up from etcd
+```
+
+
+## 200-node Quagga router topology
+
+Install required prerequisites:
+
+```
+pip install -r examples/builder/requirements.txt 
+```
+
+Generate a ranom 200-node network topology 199 links
+
+```
+./examples/builder/builder 200 0
+Total number of links generated: 199
+```
+
+Create the topology 
+
+```
+./bin/k8s-topo --create examples/builder/RANDTOPO.yml
+```
+
 ```
 
 [meshnet-cni]: https://github.com/networkop/meshnet-cni

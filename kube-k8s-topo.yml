@@ -12,3 +12,4 @@ spec:
   containers:
   - name: k8s-topo
     image: networkop/k8s-topo
+    imagePullPolicy: Always
