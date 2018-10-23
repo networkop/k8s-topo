@@ -5,8 +5,10 @@ metadata:
   labels:
     run: k8s-topo-service
 spec:
+  type: NodePort 
   ports:
   - port: 80
+    nodePort: 32080
     protocol: TCP
   selector:
     app: k8s-topo
