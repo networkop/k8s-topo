@@ -43,8 +43,8 @@ class Device(object):
         if self.prefix == 'qrtr': # This case is for quagga/zebra config
             loopback = 'lo'
             switchport = ''
-            ospf = ''
-        elif self.prefix = 'sw': # This case is for cEOS
+            ospf = []
+        else: # This case is for cEOS
             loopback = 'Loopback0'
             switchport = '   no switchport'
             ospf = ["ip routing", "!",
