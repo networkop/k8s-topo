@@ -206,17 +206,17 @@ class Device(object):
         cmap = client.V1ConfigMap()
         cmap.metadata = client.V1ObjectMeta(name=f"{self.name}-config")
         cmap.data = {}
-        cmap.data["startup-config"] = text
+        cmap.data[self.startup_file] = text
         K8S.create_namespaced_config_map(namespace=self.namespace, body=cmap)
 
     def unconfigure(self):
         cmap = client.V1ConfigMap()
-        cmap.metadata = client.V1ObjectMeta(name="startup-config")
+        cmap.metadata = client.V1ObjectMeta(name=f"{self.name}-config")
         try:
             K8S.delete_namespaced_config_map(name=f"{self.name}-config", 
                                              namespace=self.namespace, body=cmap)
         except:
-            LOG.debug(f'Failed to delete ConfigMap')
+            LOG.info(f'Failed to delete ConfigMap')
 
     # Creates NodePort service for external access to pods
     def create_service(self, inside, outside):
@@ -396,10 +396,7 @@ class Quagga(Device):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.image =  'networkop/qrtr'
-        # Extracting idx from hostname
-        #idx = self.name.split('-')[-1]
-        #self.args = [idx]
-        self.conf_path = "/etc/quagga/"
+        self.conf_path = "/etc/quagga"
         self.startup_file = "zebra.conf"
 
     @staticmethod
@@ -461,9 +458,6 @@ def main():
     CEOS_IMAGE = t_yml.get('ceos_image', os.getenv('CEOS_IMAGE', CEOS_IMAGE))
     CONF_DIR = t_yml.get('conf_dir', os.getenv('CONF_DIR', CONF_DIR))
     PUBLISH_BASE = t_yml.get('publish_base', os.getenv('PUBLISH_BASE', PUBLISH_BASE))
-
-    # Update conf_dir to be relevant to topology file directory
-    CONF_DIR = os.path.join(t_file_pwd, CONF_DIR)
 
     devices, links = parse_yaml(t_yml)
 

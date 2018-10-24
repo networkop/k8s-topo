@@ -5,6 +5,6 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-docker build -t k8s-topo .
+docker build --no-cache -t k8s-topo .
 docker tag k8s-topo $1/k8s-topo
 docker push $1/k8s-topo
