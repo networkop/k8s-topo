@@ -34,6 +34,13 @@ Update the image name in `kube-k8s-topo.yml` to match your dockerhub username an
 kubectl create -f kube-k8s-topo.yml
 ```
 
+# Visualisation
+Every time a new topology is created with `k8s-topo --create topology_name` command, a corresponding graph object gets created and fed into a simple D3.js-based web page. A NodePort service exposes internal web server, running inside a `k8s-topo` pod, on port **32080** of every node.
+
+![](random.png)
+
+The colour of vertices represent the node the pod is running on. In these case there are 4 nodes in total.
+
 # Examples 
 
 ## Prerequisites
@@ -131,8 +138,9 @@ Total number of links generated: 199
 Create the topology (takes about 20 seconds)
 
 ```
-./bin/k8s-topo --create examples/builder/RANDTOPO.yml
+./bin/k8s-topo --create examples/builder/random.yml
 ```
+
 
 
 

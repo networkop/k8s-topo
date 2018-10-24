@@ -10,8 +10,9 @@ import random
 
 class Device(object):
 
-    def __init__(self, idx, prefix='sw'):
-        self.name = f'{prefix}-{idx+1}'
+    def __init__(self, idx, prefix):
+        self.prefix = prefix
+        self.name = f'{self.prefix}-{idx+1}'
         self.idx = idx
         self.intf_num = 1
         self.peers = dict()
@@ -39,13 +40,21 @@ class Device(object):
 
     def generate_config(self):
         my_idx = self.name.split('-')[-1]
-        hostname = ["!", f"hostname {self.name}", "!"]
-        ospf = ["ip routing", "!",
+        if self.prefix == 'qrtr': # This case is for quagga/zebra config
+            loopback = 'lo'
+            switchport = ''
+            ospf = ''
+        elif self.prefix = 'sw': # This case is for cEOS
+            loopback = 'Loopback0'
+            switchport = '   no switchport'
+            ospf = ["ip routing", "!",
         "router ospf 1", 
         "   network 0.0.0.0 255.255.255.255 area 0",
+        "   passive-interface eth0"
         "   exit",
         "!"]
-        loopback = ["interface Loopback0",
+        hostname = ["!", f"hostname {self.name}", "!"]
+        loopback = [f"interface {loopback}",
         f"   ip address 198.51.100.{my_idx}/32",
         "   exit",
         "!"]
@@ -53,7 +62,7 @@ class Device(object):
         for my_intf,link in self.peers.items():
             interfaces.append(f"interface {my_intf}")
             interfaces.append(f"   ip address {link['link_prefix']}.{my_idx}/24")
-            interfaces.append("   no switchport")
+            interfaces.append(switchport)
             interfaces.append("   exit")
             interfaces.append("!")
         return '\n'.join(hostname + ospf + loopback + interfaces)
@@ -101,11 +110,11 @@ def main():
         print(f"Total number of nodes cannot exceed {max_links}")
         exit(0)
     # Setting defaults
-    cwd = cwd = os.path.dirname(os.path.realpath(__file__))
+    cwd = os.path.dirname(os.path.realpath(__file__))
 
     # Generate topology name and create conf_dir
-    random_name = "RANDTOPO"
-    conf_dir = os.path.join(cwd, f"CONF-{random_name}")
+    random_name = "random"
+    conf_dir = os.path.join(cwd, f"config-{random_name}")
     os.makedirs(conf_dir, exist_ok=True)
 
     # Initialise ip_links dict
@@ -173,11 +182,10 @@ def main():
     # Generate topology file
     topology = dict()
     topology['etcd_port'] = 32379
-    topology['conf_dir'] = f"./CONF-{random_name}"
+    topology['conf_dir'] = conf_dir
     topology['links'] = [{"endpoints": sorted(list(v)) } for _,v in ip_links.items() if len(v) == 2]
     write_file(f"{random_name}.yml",yaml.dump(topology))
     print(f"Total number of links generated: {len(topology['links'])}")
-
 
 
 if __name__ == '__main__':
