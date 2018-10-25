@@ -35,7 +35,7 @@ kubectl create -f kube-k8s-topo.yml
 ```
 
 # Visualisation
-Every time a new topology is created with `k8s-topo --create topology_name` command, a corresponding graph object gets created and fed into a simple D3.js-based web page. A NodePort service exposes internal web server, running inside a `k8s-topo` pod, on port **32080** of every node.
+Every time a new topology is created with `k8s-topo --create topology_name` command, it's possible to view a visual graph, representing this topology. Using `k8s-topo --graph topology_name` after the topology has been created, will create a json representation of a graph and feed it into a simple D3.js-based web page. A NodePort service exposes internal web server, running inside a `k8s-topo` pod, on port **32080** of every node.
 
 ![](random.png)
 
@@ -128,11 +128,11 @@ Install required prerequisites:
 pip install -r examples/builder/requirements.txt 
 ```
 
-Generate a ranom 200-node network topology 199 links
+Generate a ranom 200-node, network topology with 10000 links
 
 ```
-./examples/builder/builder 200 0
-Total number of links generated: 199
+./examples/builder/builder 200 801
+Total number of links generated: 1000
 ```
 
 Create the topology (takes about 20 seconds)

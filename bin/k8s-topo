@@ -430,7 +430,7 @@ def main():
     create  = args.create
     destroy = args.destroy
     show    = args.show
-    test    = args.test
+    graph   = args.graph
     eif     = args.eif
     t_file  = os.path.join(os.getcwd(), args.topology)
     t_file_pwd = os.path.split(args.topology)[0]
