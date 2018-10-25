@@ -17,10 +17,9 @@ COPY web/nginx.conf /etc/nginx/conf.d/default.conf
 
 RUN mkdir -p /run/nginx
 
-RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)
-/bin/linux/amd64/kubectl
+RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
 
-RUN chmod +x kubectp
+RUN chmod +x kubectl && mv kubectl /usr/local/sbin/
 
 EXPOSE 80
 
