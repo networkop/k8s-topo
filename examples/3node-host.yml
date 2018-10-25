@@ -1,4 +1,4 @@
-etcd_port: 32781
+etcd_port: 32379
 links:
   - endpoints: ["host-1:eth1:12.12.12.1/24", "host-2:eth1:12.12.12.2/24"]
   - endpoints: ["host-1:eth2:13.13.13.1/24", "host-3:eth1:13.13.13.3/24"]

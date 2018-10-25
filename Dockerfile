@@ -4,7 +4,7 @@ RUN apk add --no-cache git
 RUN git clone https://github.com/networkop/k8s-topo.git
 WORKDIR k8s-topo
 
-RUN apk add --no-cache python3 build-base python3-dev openssl-dev libffi-dev libstdc++ nginx curl && \
+RUN apk add --no-cache python3 build-base python3-dev openssl-dev libffi-dev libstdc++ nginx curl jq && \
     python3 -m ensurepip && \
     rm -r /usr/lib/python*/ensurepip && \
     pip3 install --upgrade pip setuptools && \
