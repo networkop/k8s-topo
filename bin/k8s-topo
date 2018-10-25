@@ -60,8 +60,8 @@ def parse_args():
         action="store_true"
     )
     main_group.add_argument(
-        "--test",
-        help="Flag for testing",
+        "--graph",
+        help="Generate a D3 graph",
         action="store_true"
     )
 
@@ -440,7 +440,7 @@ def main():
         log_level = logging.DEBUG
     else:
         log_level = logging.INFO
-    logging.basicConfig(level=log_level)
+    LOG.setLevel(level=log_level)
 
     # Loading topology YAML file
     with open(t_file, 'r') as stream:
@@ -483,11 +483,7 @@ def main():
             devices[name].create_service(443,base+idx+443)
 
         LOG.info(''.join([f"\nalias {name}='{device.entry_cmd}'" for (name, device) in devices.items()]))
-        
-        # Creating d3 graph
-        create_d3_graph(devices, links)
-        LOG.info("D3 graph created")
-    
+           
     elif destroy:
         destroyed = [bool(device.destroy()) for _,device  in devices.items()]
         if not all(destroyed):
@@ -521,8 +517,9 @@ def main():
                 if all(enabled):
                     LOG.info("All cEOS pods have IP forwarding enabled")
                     break
-    elif test:
+    elif graph:
         create_d3_graph(devices, links)
+        LOG.info("D3 graph created")
     
     return 0
 
