@@ -1,0 +1,36 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: docker-registry
+spec:
+  selector:
+    app: docker-registry
+  ports:
+  - name: http
+    protocol: TCP
+    port: 5000
+    targetPort: 5000
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: internal-docker-registry
+  labels:
+    app: docker-registry
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: docker-registry
+    spec:
+      containers:
+      - image: registry:latest
+        name: docker-registry
+        ports:
+        - containerPort: 5000
+      restartPolicy: Always
+
+
+
