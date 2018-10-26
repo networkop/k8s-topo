@@ -315,6 +315,9 @@ class Device(object):
             container.command = self.command
             container.args    = self.args
             container.env     = self.environment
+
+            resource_requirements = client.V1ResourceRequirements(limits={"cpu":"0.5"})
+            container.resource = resource_requirements
             
             sec_context                = client.V1SecurityContext(privileged=True)
             container.security_context = sec_context
@@ -510,6 +513,9 @@ def main():
     elif graph:
         create_d3_graph(devices, links)
         LOG.info("D3 graph created")
+        import socket
+        my_ip = socket.gethostbyname(socket.gethostname())
+        LOG.info(f"URL: http://{my_ip}:32080")
     
     return 0
 
