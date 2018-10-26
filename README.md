@@ -127,7 +127,6 @@ Topology definition file (cEOS is stored in a private Docker registry)
 
 ```yaml
 etcd_port: 32379
-ceos_image: 10.233.6.223:5000/ceos:4.20.5F
 conf_dir: ./config-3node
 links:
   - endpoints: ["sw-1:eth1", "sw-2:eth1"]
