@@ -57,22 +57,25 @@ NAME              TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
 docker-registry   ClusterIP   10.233.6.223   <none>        5000/TCP   10s
 ```
 
+We can store the image URL in environment variable
+
+```
+export CEOS_IMAGE=$(kubectl get service docker-registry -o json | jq -r '.spec.clusterIP'):5000/ceos:4.20.5F
+```
+
+
 Now we can upload any docker image to this registry:
 
 ```
 docker import cEOS-4.20.5F-lab.tar.xz ceos:4.20.5F
-docker image tag ceos:4.20.5F 10.233.6.223:5000/ceos:4.20.5F
-docker image push 10.233.6.223:5000/ceos:4.20.5F 
+docker image tag ceos:4.20.5F $CEOS_IMAGE
+docker image push $CEOS_IMAGE 
 The push refers to repository [10.233.6.223:5000/ceos]
 7d3e293b5c56: Pushed 
 4.20.5F: digest: sha256:caee130f23d25206ae5a3381c6c716b83fa12122f9a092ba99b09bd106c5f970 size: 529
 ```
 
 This registry and cEOS image can now be used in the examples below
-
-```
-export CEOS_IMAGE=$(kubectl get service docker-registry -o json | jq -r '.spec.clusterIP'):5000/ceos:4.20.5F
-```
 
 # Examples 
 
@@ -137,13 +140,8 @@ links:
 Create the topology
 
 ```bash
+export CEOS_IMAGE=$(kubectl get service docker-registry -o json | jq -r '.spec.clusterIP'):5000/ceos:4.20.5F
 ./bin/k8s-topo --create examples/3node-ceos.yml
-INFO:__main__:All data has been uploaded to etcd
-INFO:__main__:All pods have been created successfully
-INFO:__main__:
-alias sw-1='kubectl exec -it sw-1 Cli'
-alias sw-2='kubectl exec -it sw-2 Cli'
-alias sw-3='kubectl exec -it sw-3 Cli'
 ```
 
 List all pods in the topology
@@ -155,7 +153,7 @@ sw-2@node1
 sw-3@node1
 ```
 
-Interact with a pod
+Interact with any pod
 
 ```
 /k8s-topo # sw-1
@@ -209,10 +207,49 @@ unalias sw-3
 INFO:__main__:All data has been cleaned up from etcd
 ```
 
+## 20-node random cEOS topology
 
-## 200-node Quagga router topology
+```
+./examples/builder/builder --prefix sw 20 0
+```
 
-Generate a ranom 200-node, network topology with 10000 links
+Create the topology (takes about 2 minutes)
+
+```
+./bin/k8s-topo --create examples/builder/random.yml
+```
+
+Enable ip forwarding inside cEOS containers
+
+```
+./bin/k8s-topo --eif examples/builder/random.yml
+```
+
+View topology graph
+
+```
+./bin/k8s-topo --graph examples/builder/random.yml
+INFO:__main__:D3 graph created
+INFO:__main__:URL: http://10.83.30.251:32080
+```
+
+Check connectivity
+
+```
+/k8s-topo # kubectl exec -it sw-1 Cli
+/ # for i in `seq 1 20`; do ping -c 1 -W 1 198.51.100.$i|grep loss; done
+1 packets transmitted, 1 packets received, 0% packet loss
+```
+
+Destroy the topology
+
+```bash
+./bin/k8s-topo --destroy examples/builder/random.yml
+```
+
+## 200-node random Quagga router topology
+
+Generate a ranom 200-node, network topology with 1000 links
 
 ```
 ./examples/builder/builder 200 801
