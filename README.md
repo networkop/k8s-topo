@@ -5,12 +5,9 @@ Arbitray network topology builder for network simulations inside Kubernetes. Ana
 
 0. Installation instructions
 1. Add more examples
-2. Add K8S setup/teardown instructions
-3. Add logging
-4. Save/archive action for device configs
-5. Arbitrary port number publishing
-6. Add visualisation explanation
-7. Create correlation between node name and index
+2. Add logging
+3. Save/archive action for device configs
+4. Arbitrary port number publishing
 
 ## Local installation
 
@@ -35,11 +32,11 @@ kubectl create -f kube-k8s-topo.yml
 ```
 
 # Visualisation
-Every time a new topology is created with `k8s-topo --create topology_name` command, it's possible to view a visual graph, representing this topology. Using `k8s-topo --graph topology_name` after the topology has been created, will create a json representation of a graph and feed it into a simple D3.js-based web page. A NodePort service exposes internal web server, running inside a `k8s-topo` pod, on port **32080** of every node.
+After the topology has been created, it is possible to view the resulting graph. The `k8s-topo --graph topology_name` command will create a json representation of the topology graph and feed it into a simple D3.js-based web page. This web page, running inside a `k8s-topo` pod, is exposed externally as a NodePort service on port **32080** of every node.
 
 ![](random.png)
 
-The colour of vertices represent the node the pod is running on. In these case there are 4 nodes in total.
+The colour of vertices represent the node the pod is running on. In this case the topology is spread across 4 different nodes.
 
 # Private docker registry setup
 
@@ -208,6 +205,9 @@ INFO:__main__:All data has been cleaned up from etcd
 
 ## 20-node random cEOS topology
 
+Generate a random 20-node cEOS topology
+
+
 ```
 ./examples/builder/builder --prefix sw 20 0
 ```
@@ -224,7 +224,7 @@ Enable ip forwarding inside cEOS containers
 ./bin/k8s-topo --eif examples/builder/random.yml
 ```
 
-View topology graph
+Generate the topology graph
 
 ```
 ./bin/k8s-topo --graph examples/builder/random.yml
@@ -248,7 +248,7 @@ Destroy the topology
 
 ## 200-node random Quagga router topology
 
-Generate a ranom 200-node, network topology with 1000 links
+Generate a random 200-node network topology with 1000 links
 
 ```
 ./examples/builder/builder 200 801
