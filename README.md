@@ -140,7 +140,6 @@ links:
 Create the topology
 
 ```bash
-export CEOS_IMAGE=$(kubectl get service docker-registry -o json | jq -r '.spec.clusterIP'):5000/ceos:4.20.5F
 ./bin/k8s-topo --create examples/3node-ceos.yml
 ```
 
@@ -236,7 +235,7 @@ INFO:__main__:URL: http://10.83.30.251:32080
 Check connectivity
 
 ```
-/k8s-topo # kubectl exec -it sw-1 Cli
+/k8s-topo # kubectl exec -it sw-1 bash
 / # for i in `seq 1 20`; do ping -c 1 -W 1 198.51.100.$i|grep loss; done
 1 packets transmitted, 1 packets received, 0% packet loss
 ```
