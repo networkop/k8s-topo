@@ -43,7 +43,7 @@ The colour of vertices represent the node the pod is running on. In these case t
 
 # Private docker registry setup
 
-It's possible to setup a private docker registry with the following command:
+It's possible to setup a private docker registry to speed up the image pull process and store cEOS images locally:
 
 ```
 kubectl create -f examples/docker-registry/docker-registry.yml 
@@ -57,14 +57,14 @@ NAME              TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
 docker-registry   ClusterIP   10.233.6.223   <none>        5000/TCP   10s
 ```
 
-We can store the image URL in environment variable
+The following environment variable will be used by `k8s-topo` script to set the default cEOS image:
 
 ```
 export CEOS_IMAGE=$(kubectl get service docker-registry -o json | jq -r '.spec.clusterIP'):5000/ceos:4.20.5F
 ```
 
 
-Now we can upload any docker image to this registry:
+Now we can upload the cEOS docker image to this registry:
 
 ```
 docker import cEOS-4.20.5F-lab.tar.xz ceos:4.20.5F
