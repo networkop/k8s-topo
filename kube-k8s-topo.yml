@@ -35,8 +35,13 @@ spec:
     volumeMounts:
       - name: kube-config
         mountPath: /root/.kube/
+      - name: kubectl
+        mountPath: /usr/local/sbin
   terminationGracePeriodSeconds: 0
   volumes:
     - name: kube-config
       hostPath:
         path: /root/.kube/
+    - name: kubectl
+      hostPath:
+        path: /opt/bin
