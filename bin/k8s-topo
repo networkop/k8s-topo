@@ -475,7 +475,7 @@ def main():
             devices[name].create_service(443,base+idx+443)
         LOG.info(f"All pods have their TCP/443 port published starting from {base}")
 
-        LOG.info(''.join([f"\nalias {name}='{device.entry_cmd}'" for (name, device) in devices.items()]))
+        LOG.info(''.join([f"\n alias {name}='{device.entry_cmd}'" for (name, device) in devices.items()]))
            
     elif destroy:
         destroyed = [bool(device.destroy()) for _,device  in devices.items()]
@@ -484,7 +484,7 @@ def main():
         else:
             LOG.info('All pods have been destroyed successfully')
 
-        LOG.info(''.join([f"\nunalias {name}" for name in devices.keys()]))
+        LOG.info(''.join([f"\n unalias {name}" for name in devices.keys()]))
 
         cleanup =  [bool(device.delete_from_etcd(etcd_host, etcd_port)) for _,device in devices.items()]
         if not all(cleanup):
