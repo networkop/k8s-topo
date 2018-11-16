@@ -50,7 +50,7 @@ class Device(object):
             ospf = ["ip routing", "!",
         "router ospf 1", 
         "   network 0.0.0.0 255.255.255.255 area 0",
-        "   passive-interface eth0"
+        "   passive-interface eth0",
         "   exit",
         "!"]
         hostname = ["!", f"hostname {self.name}", "!"]
