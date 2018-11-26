@@ -316,8 +316,8 @@ class Device(object):
             container.args    = self.args
             container.env     = self.environment
 
-            resource_requirements = client.V1ResourceRequirements(limits={"cpu":"0.5"})
-            container.resources = resource_requirements
+            #resource_requirements = client.V1ResourceRequirements(limits={"cpu":"0.5"})
+            #container.resources = resource_requirements
             
             sec_context                = client.V1SecurityContext(privileged=True)
             container.security_context = sec_context
