@@ -297,7 +297,7 @@ class Device(object):
     
     def delete_from_etcd(self, etcd_host, etcd_port):
         etcd = etcd3.client(host=etcd_host, port=etcd_port)
-        etcd.delete(f'/{self.name}/links')
+        etcd.delete_prefix(f'/{self.name}')
         return self.download_from_etcd(etcd_host, etcd_port)[0] is None
 
     def connect(self, interface, link):
@@ -316,8 +316,9 @@ class Device(object):
             container.args    = self.args
             container.env     = self.environment
 
-            resource_requirements = client.V1ResourceRequirements(limits={"cpu":"0.5"})
-            container.resources = resource_requirements
+            container.image_pull_policy = "IfNotPresent"
+            #resource_requirements = client.V1ResourceRequirements(limits={"cpu":"0.5"})
+            #container.resources = resource_requirements
             
             sec_context                = client.V1SecurityContext(privileged=True)
             container.security_context = sec_context
