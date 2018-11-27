@@ -317,6 +317,7 @@ class Device(object):
             container.env     = self.environment
 
             container.image_pull_policy = "IfNotPresent"
+
             #resource_requirements = client.V1ResourceRequirements(limits={"cpu":"0.5"})
             #container.resources = resource_requirements
             
