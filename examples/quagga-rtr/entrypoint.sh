@@ -8,7 +8,7 @@
 #fi
 
 # Starting Zebra
-if [ ! -f /etc/quagga/zebra.conf]; then
+if [ ! -f /etc/quagga/zebra.conf ]; then
   echo 'Creating empty zebra.conf'
   touch /etc/quagga/zebra.conf
 fi
