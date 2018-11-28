@@ -332,9 +332,9 @@ class Device(object):
             init_container                   = client.V1Container(name=f"init-{self.name}")
             init_container.image             = "alpine"
             init_container.image_pull_policy = "IfNotPresent"
-            init_container.command           = [f"sleep {self.sleep}"]
+            init_container.command           = ["sh", "-c", f"sleep {self.sleep}"]
 
-            container.init_containers = [init_container]
+            #container.init_containers = [init_container]
             #resource_requirements = client.V1ResourceRequirements(limits={"cpu":"0.5"})
             #container.resources = resource_requirements
             
@@ -354,6 +354,7 @@ class Device(object):
             if self.config_present:
                 spec.volumes=[volume]
             spec.termination_grace_period_seconds = 0
+            spec.init_containers = [init_container]
             pod=client.V1Pod()
             pod.metadata=client.V1ObjectMeta(name=self.name, 
                                              labels={"app": self.name})
