@@ -170,6 +170,15 @@ def create_d3_graph(devices, links):
     with open(filepath, 'w') as f:
         f.write(json.dumps(json_graph.node_link_data(g), indent=2))
 
+def delayed_start(devices):
+    # Naive implementation
+    # Base increments will be applied to every $step devics
+    step = 10 
+    base = 10
+    for idx, (_, device) in enumerate(devices.items()):
+        delay = (idx // step) * base
+        device.set_sleep(delay)
+
 
 class Device(object):
     def __init__(self, name):
@@ -181,6 +190,7 @@ class Device(object):
         self.args = list()
         self.image = ''
         self.environment = []
+        self.sleep = 0
         self.full_links = list()
         self.entry_cmd = f"kubectl exec -it {self.name} sh"
         self.config_present = True
@@ -251,7 +261,9 @@ class Device(object):
                       self.namespace, command=command, stderr=True, 
                       stdin=True, stdout=True, tty=False)
 
-
+    def set_sleep(self, num):
+        self.sleep = num
+    
     def get_status(self):
         return K8S.read_namespaced_pod_status(self.name, self.namespace).status.phase
 
@@ -310,14 +322,19 @@ class Device(object):
     def create(self):
         self.configure()
         if not self.get():
-            container         = client.V1Container(name=self.name)
-            container.image   = self.image
-            container.command = self.command
-            container.args    = self.args
-            container.env     = self.environment
-
+            container                   = client.V1Container(name=self.name)
+            container.image             = self.image
+            container.command           = self.command
+            container.args              = self.args
+            container.env               = self.environment
             container.image_pull_policy = "IfNotPresent"
 
+            init_container                   = client.V1Container(name=f"init-{self.name}")
+            init_container.image             = "alpine"
+            init_container.image_pull_policy = "IfNotPresent"
+            init_container.command           = [f"sleep {self.sleep}"]
+
+            container.init_containers = [init_container]
             #resource_requirements = client.V1ResourceRequirements(limits={"cpu":"0.5"})
             #container.resources = resource_requirements
             
@@ -454,6 +471,8 @@ def main():
     PUBLISH_BASE = t_yml.get('publish_base', os.getenv('PUBLISH_BASE', PUBLISH_BASE))
 
     devices, links = parse_yaml(t_yml)
+    
+    delayed_start(devices)
 
     if create:
         uploaded = [bool(device.upload_to_etcd(etcd_host, etcd_port)) for _,device in devices.items()]
