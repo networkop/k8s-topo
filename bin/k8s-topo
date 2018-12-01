@@ -170,13 +170,16 @@ def create_d3_graph(devices, links):
     with open(filepath, 'w') as f:
         f.write(json.dumps(json_graph.node_link_data(g), indent=2))
 
-def delayed_start(devices):
+def delayed_start(devices, step = 15, base = 45):
     # Naive implementation
     # Base increments will be applied to every $step devics
-    step = 10 
-    base = 10
+    num_nodes = 4
+    #total_devices = len(devices)
+    #max_wait = total_devices * 5
+    #import random
     for idx, (_, device) in enumerate(devices.items()):
-        delay = (idx // step) * base
+        delay = (idx // step) * base * num_nodes
+        #delay = random.randint(0, max_wait)
         device.set_sleep(delay)
 
 
@@ -453,6 +456,7 @@ def main():
     else:
         log_level = logging.INFO
     LOG.setLevel(level=log_level)
+    logging.basicConfig(level=log_level)
 
     # Loading topology YAML file
     with open(t_file, 'r') as stream:
@@ -470,10 +474,12 @@ def main():
     CEOS_IMAGE = t_yml.get('ceos_image', os.getenv('CEOS_IMAGE', CEOS_IMAGE))
     CONF_DIR = t_yml.get('conf_dir', os.getenv('CONF_DIR', CONF_DIR))
     PUBLISH_BASE = t_yml.get('publish_base', os.getenv('PUBLISH_BASE', PUBLISH_BASE))
+    delay = t_yml.get('delay', os.getenv('delay', False))
 
     devices, links = parse_yaml(t_yml)
     
-    delayed_start(devices)
+    if delay:
+        delayed_start(devices)
 
     if create:
         uploaded = [bool(device.upload_to_etcd(etcd_host, etcd_port)) for _,device in devices.items()]

@@ -184,6 +184,8 @@ def main():
     # Generate topology file
     topology = dict()
     topology['etcd_port'] = 32379
+    if prefix == 'sw':
+        topology['delay'] = "true"    
     topology['conf_dir'] = conf_dir
     topology['links'] = [{"endpoints": sorted(list(v)) } for _,v in ip_links.items() if len(v) == 2]
     write_file(f"{random_name}.yml",yaml.dump(topology))

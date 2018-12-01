@@ -2,8 +2,8 @@
 var colorscheme = ["#dc241f","#0087DC","#008142","#70147a","#eeeeee","#dc241f"]
 var maxcolour = colorscheme.length
 
-var width = 1000,
-    height = 900;
+var width = 1200,
+    height = 1500;
 
 
 var force = d3.layout.force()
