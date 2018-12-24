@@ -2,5 +2,5 @@ PyYAML==3.12
 netaddr==0.7.19
 etcd3==0.8.1
 kubernetes==7.0.0
-urllib3==1.22
+urllib3>=1.23
 networkx==2.2
