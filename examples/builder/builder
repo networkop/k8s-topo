@@ -123,8 +123,8 @@ def main():
     # Assigning arguments
     args = parse_args()
     num  = args.num
-    if num>250:
-        print("Number of nodes cannot exceed 250")
+    if num>750:
+        print("Number of nodes cannot exceed 750")
         exit(0)
     extra = args.extra
     prefix = args.prefix
