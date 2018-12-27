@@ -8,6 +8,26 @@ import yaml
 import json
 import random
 
+
+LOOPBACK_RANGES = ['192.0.2.0/24', '198.51.100.0/24', '203.0.113.0/24']
+INFRA_RANGE = '10.0.0.0/8'
+
+class Network(object):
+    
+    def __init__(self, ip_ranges, masksize):
+        import netaddr
+        from itertools import chain
+        self.subnets = (y for x in ip_ranges for y in netaddr.IPNetwork(x).subnet(masksize)) 
+
+    def next(self):
+        try:
+            return next(self.subnets)
+        except StopIteration:
+            return None
+
+LOOPBACK_IPS = Network(LOOPBACK_RANGES, 32)
+
+
 class Device(object):
 
     def __init__(self, idx, prefix):
@@ -53,7 +73,8 @@ class Device(object):
         "   exit",
         "!"]
         loopback = [f"interface {loopback}",
-        f"   ip address 198.51.100.{my_idx}/32",
+        #f"   ip address 198.51.100.{my_idx}/32",
+        f"   ip address {LOOPBACK_IPS.next()}",
         "   exit",
         "!"]
         interfaces = []
@@ -122,6 +143,9 @@ def main():
     # Initialise ip_links dict
     ip_links = dict()
 
+    # Initialise ip ranges
+    infra_range = Network([INFRA_RANGE], 31)
+
 
     # Initialise list of devices
     devices = [Device(x, prefix=prefix) for x in range(num)]
@@ -141,12 +165,15 @@ def main():
             my_device = devices[my_idx]
 
             link_num = sorted((str(my_idx+1), str(peer_idx+1)))   
-            link_prefix = f"10.{link_num[0]}.{link_num[1]}"   
+            #link_prefix = f"10.{link_num[0]}.{link_num[1]}"   
+            link_prefix = infra_range.next()
 
-            my_intf, peer_intf =my_device.connect(peer_device, link_prefix)
+            my_intf, peer_intf = my_device.connect(peer_device, link_prefix)
 
-            my_ip = f"{link_prefix}.{my_idx+1}/24"
-            peer_ip = f"{link_prefix}.{peer_idx+1}/24"
+            #my_ip = f"{link_prefix}.{my_idx+1}/24"
+            #peer_ip = f"{link_prefix}.{peer_idx+1}/24"
+            my_ip = f"{link_prefix[0]}/{link_prefix.prefixlen}"
+            peer_ip = f"{link_prefix[-1]}/{link_prefix.prefixlen}"
 
             link = ip_links.get(link_prefix, set())
             link.add(f"{my_device.name}:{my_intf}:{my_ip}")
@@ -166,12 +193,15 @@ def main():
             break
         my_device, peer_device = random.sample(devices, 2)
         link_num = sorted((str(my_device.idx+1), str(peer_device.idx+1)))   
-        link_prefix = f"10.{link_num[0]}.{link_num[1]}"   
+        #link_prefix = f"10.{link_num[0]}.{link_num[1]}"  
+        link_prefix = infra_range.next()
         if link_prefix in ip_links:
             continue
         my_intf, peer_intf =my_device.connect(peer_device, link_prefix)
-        my_ip = f"{link_prefix}.{my_device.idx+1}/24"
-        peer_ip = f"{link_prefix}.{peer_device.idx+1}/24"
+        #my_ip = f"{link_prefix}.{my_device.idx+1}/24"
+        #peer_ip = f"{link_prefix}.{peer_device.idx+1}/24"
+        my_ip = f"{link_prefix[0]}/{link_prefix.prefixlen}"
+        peer_ip = f"{link_prefix[-1]}/{link_prefix.prefixlen}"
         link = ip_links.get(link_prefix, set())
         link.add(f"{my_device.name}:{my_intf}:{my_ip}")
         link.add(f"{peer_device.name}:{peer_intf}:{peer_ip}")
