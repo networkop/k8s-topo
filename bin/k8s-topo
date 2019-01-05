@@ -431,6 +431,7 @@ class XRV(Device):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.image =  XRV_IMAGE
+        self.type = 'xrv'
 
 class Link(object):
     def __init__(self, link_type, idx):
@@ -508,12 +509,32 @@ def main():
 
         
         # Publishing external ports
-        ceos_only = [k for k in devices.keys() if devices[k].type == 'ceos']
-        base = int(PUBLISH_BASE)
-        for idx,name in enumerate(sorted(ceos_only)):
-            # Hard-coding this to 443 for now
-            devices[name].create_service(443,base+idx+443)
-        LOG.info(f"All pods have their TCP/443 port published starting from {base}")
+        device_names = [k for k in devices.keys() if devices[k].type in ['ceos', 'xrv']]
+        # Publishing ports. If type is INT assuming default behaviour which is
+        # Single mapping of inside 443 to outside PUBLISH_BASE+index
+        if PUBLISH_BASE and (type(PUBLISH_BASE) == int):
+            base = int(PUBLISH_BASE)
+            if 30100 <= base <= 32767: # Hardcoding default nodeport range 30000-32767 (offset by 100 to not clash with k8s-topo port)
+                for idx,name in enumerate(sorted(device_names)):
+                    # Default is to publish port TCP/443
+                    devices[name].create_service(443,base+idx+443)
+                LOG.info(f"All pods have their TCP/443 port published starting from {base}")
+        # The second case is when PUBLISH_BASE is a dict, in which case
+        # Each element is a mapping: INTERNAL:EXTERNAL, where
+        # INTERNAL is an INTEGER, e.g. 22 and
+        # EXTERNAL is an INTEGER, e.g. 30100, must be in range (30000+100)-32767
+        # Example: PUBLISH_BASE: {22:30100,443:30200}
+        # Note that we're not checking there's no clash between different nodeports
+        elif type(PUBLISH_BASE) == dict:
+            for inside,outside in PUBLISH_BASE.items():
+                LOG.debug("Publish internal port {} -> {} (type {})".format(inside, outside, type(outside)))
+                # Sort all device names alphabetically
+                for idx,name in enumerate(sorted(device_names)):
+                    # Check that we've got the right types
+                    if type(inside) == int and type(outside) == int:
+                        nodeport = outside + idx
+                    devices[name].create_service(inside,nodeport)
+        
 
         LOG.info(''.join([f"\n alias {name}='{device.entry_cmd}'" for (name, device) in devices.items()]))
            
