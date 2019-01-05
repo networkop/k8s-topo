@@ -432,6 +432,7 @@ class XRV(Device):
         super().__init__(*args, **kwargs)
         self.image =  XRV_IMAGE
         self.type = 'xrv'
+        self.args = ['--meshnet']
 
 class Link(object):
     def __init__(self, link_type, idx):
