@@ -24,6 +24,9 @@ K8S = client.CoreV1Api()
 ETCD_HOST = "localhost"
 ETCD_PORT = 2379
 CEOS_IMAGE = 'ceos:latest'
+VMX_IMAGE = 'vrnetlab/vr-vmx:17.2R1.13'
+CSR_IMAGE = 'vrnetlab/vr-csr:16.04.01'
+XRV_IMAGE = 'vrnetlab/vr-xrv:6.1.2'
 CONF_DIR = './config'
 PUBLISH_BASE = 30000
 ENABLE_IP_FORWARDING = True
@@ -423,6 +426,11 @@ class Quagga(Device):
         self.conf_path = "/etc/quagga"
         self.startup_file = "zebra.conf"
 
+class XRV(Device):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.image =  XRV_IMAGE
+
 class Link(object):
     def __init__(self, link_type, idx):
         # Type is for future use, currently type is p2p
@@ -437,7 +445,7 @@ class Link(object):
 
 def main():
     # Initializing main variables
-    global CEOS_IMAGE, CONF_DIR, PUBLISH_BASE
+    global CEOS_IMAGE, CONF_DIR, PUBLISH_BASE, XRV_IMAGE, VMX_IMAGE, CSR_IMAGE
 
     # Assigning arguments
     args    = parse_args()
@@ -469,10 +477,13 @@ def main():
         return 1
 
     # Overriding defaults
-    etcd_host = t_yml.get('etcd_host', os.getenv('ETCD_HOST', ETCD_HOST))
-    etcd_port = t_yml.get('etcd_port', os.getenv('ETCD_PORT', ETCD_PORT))
+    etcd_host  = t_yml.get('etcd_host', os.getenv('ETCD_HOST', ETCD_HOST))
+    etcd_port  = t_yml.get('etcd_port', os.getenv('ETCD_PORT', ETCD_PORT))
     CEOS_IMAGE = t_yml.get('ceos_image', os.getenv('CEOS_IMAGE', CEOS_IMAGE))
-    CONF_DIR = t_yml.get('conf_dir', os.getenv('CONF_DIR', CONF_DIR))
+    VMX_IMAGE  = t_yml.get('VMX_IMAGE',os.getenv('VMX_IMAGE', VMX_IMAGE))
+    XRV_IMAGE  = t_yml.get('XRV_IMAGE',os.getenv('XRV_IMAGE', XRV_IMAGE))
+    CSR_IMAGE  = t_yml.get('CSR_IMAGE',os.getenv('CSR_IMAGE', CSR_IMAGE))
+    CONF_DIR   = t_yml.get('conf_dir', os.getenv('CONF_DIR', CONF_DIR))
     PUBLISH_BASE = t_yml.get('publish_base', os.getenv('PUBLISH_BASE', PUBLISH_BASE))
     delay = t_yml.get('delay', os.getenv('delay', False))
 
