@@ -89,6 +89,11 @@ curl -X GET http://$REGISTRY/v2/_catalog
 
 
 
+now create pointers to those images (from inside k8s-topo pod)
+export XRV_IMAGE=10.233.20.34:5000/vr-xrv:6.1.2
+export VMX_IMAGE=10.233.20.34:5000/vr-vmx:17.2R1.13
+
+
 
 
 

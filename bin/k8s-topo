@@ -121,8 +121,9 @@ def parse_endpoints(devices, endpoints, link, idx):
             # Example: ep == ["Eth2","192.168.10.30/24"]
             device = devices.get(device_name, Host(device_name))
         elif 'qrtr' in device_name.lower():      
-            # Example: ep == ["Eth2","192.168.10.30/24"]
-            device = devices.get(device_name, Quagga(device_name))   
+            device = devices.get(device_name, Quagga(device_name))  
+        elif 'xrv' in device_name.lower():      
+            device = devices.get(device_name, XRV(device_name))  
         else:
             # This creates the default CEOS device type
             device = devices.get(device_name, CEOS(device_name))
