@@ -1,0 +1,7 @@
+etcd_port: 32379
+publish_base:
+  22: 30100
+links:
+  - endpoints: ["xrv-1:eth1", "xrv-2:eth1"]
+  - endpoints: ["xrv-1:eth2", "xrv-2:eth2"]
+

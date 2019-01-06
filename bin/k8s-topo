@@ -124,6 +124,10 @@ def parse_endpoints(devices, endpoints, link, idx):
             device = devices.get(device_name, Quagga(device_name))  
         elif 'xrv' in device_name.lower():      
             device = devices.get(device_name, XRV(device_name))  
+        elif 'vmx' in device_name.lower():
+            device = devices.get(device_name, VMX(device_name))
+        elif 'csr' in device_name.lower():
+            device = devices.get(device_name, CSR(device_name))
         else:
             # This creates the default CEOS device type
             device = devices.get(device_name, CEOS(device_name))
@@ -200,6 +204,7 @@ class Device(object):
         self.sleep = 0
         self.full_links = list()
         self.entry_cmd = f"kubectl exec -it {self.name} sh"
+        self.outside = 'Unset'
         self.config_present = True
         self.namespace = 'default'
         # pointer to a k8s pod
@@ -235,8 +240,14 @@ class Device(object):
         except:
             LOG.info(f'Failed to delete ConfigMap')
 
+    # Overrides default entry_cmd for specific classes (vrnetlab)
+    def update_entry(self):
+        pass
+
     # Creates NodePort service for external access to pods
     def create_service(self, inside, outside):
+        self.outside = outside
+        self.update_entry()
         service = client.V1Service()
         service.api_version = "v1"
         service.kind = "Service"
@@ -247,7 +258,7 @@ class Device(object):
         port = client.V1ServicePort(
             name=f"port-{outside}", 
             protocol="TCP", 
-            port=outside, 
+            port=inside, 
             target_port=inside, 
             node_port=outside
             )
@@ -432,7 +443,31 @@ class XRV(Device):
         super().__init__(*args, **kwargs)
         self.image =  XRV_IMAGE
         self.type = 'xrv'
-        self.args = ['--meshnet']
+        self.args = ['--password','vrnetlab','--meshnet']
+
+    def update_entry(self):
+        self.entry_cmd = f'ssh -p {self.outside} vrnetlab@localhost'
+
+
+class VMX(Device):                        
+    def __init__(self, *args, **kwargs):                       
+        super().__init__(*args, **kwargs) 
+        self.image =  VMX_IMAGE                                
+        self.type = 'vmx'                                       
+        self.args = ['--password','vrnetlab','--meshnet']
+
+    def update_entry(self):
+        self.entry_cmd = f'ssh -p {self.outside} vrnetlab@localhost'
+
+class CSR(Device):                        
+    def __init__(self, *args, **kwargs):                       
+        super().__init__(*args, **kwargs) 
+        self.image =  CSR_IMAGE                                
+        self.type = 'csr'                                       
+        self.args = ['--password','vrnetlab','--meshnet']
+
+    def update_entry(self):
+        self.entry_cmd = f'ssh -p {self.outside} vrnetlab@localhost'                            
 
 class Link(object):
     def __init__(self, link_type, idx):
@@ -510,7 +545,7 @@ def main():
 
         
         # Publishing external ports
-        device_names = [k for k in devices.keys() if devices[k].type in ['ceos', 'xrv']]
+        device_names = [k for k in devices.keys() if devices[k].type in ['ceos', 'xrv', 'vmx', 'csr']]
         # Publishing ports. If type is INT assuming default behaviour which is
         # Single mapping of inside 443 to outside PUBLISH_BASE+index
         if PUBLISH_BASE and (type(PUBLISH_BASE) == int):

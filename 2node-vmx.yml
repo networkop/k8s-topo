@@ -1,0 +1,7 @@
+etcd_port: 32379
+publish_base:
+  22: 30100
+links:
+  - endpoints: ["vmx-1:eth1", "vmx-2:eth1"]
+  - endpoints: ["vmx-1:eth2", "vmx-2:eth2"]
+
