@@ -443,7 +443,7 @@ class XRV(Device):
         super().__init__(*args, **kwargs)
         self.image =  XRV_IMAGE
         self.type = 'xrv'
-        self.args = ['--password','vrnetlab','--meshnet']
+        self.args = ['--password','vrnetlab','--meshnet', '--trace']
 
     def update_entry(self):
         self.entry_cmd = f'ssh -p {self.outside} vrnetlab@localhost'
@@ -454,7 +454,7 @@ class VMX(Device):
         super().__init__(*args, **kwargs) 
         self.image =  VMX_IMAGE                                
         self.type = 'vmx'                                       
-        self.args = ['--password','vrnetlab','--meshnet']
+        self.args = ['--meshnet', '--trace']
 
     def update_entry(self):
         self.entry_cmd = f'ssh -p {self.outside} vrnetlab@localhost'

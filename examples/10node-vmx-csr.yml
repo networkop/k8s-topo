@@ -1,0 +1,14 @@
+etcd_port: 32379
+publish_base:
+  22: 30100
+links:
+- endpoints: ['vmx-2:eth1:10.0.0.2/30', 'csr-7:eth1:10.0.0.1/30']
+- endpoints: ['vmx-2:eth2:10.0.0.5/30', 'csr-3:eth1:10.0.0.6/30']
+- endpoints: ['csr-3:eth2:10.0.0.9/30', 'vmx-6:eth1:10.0.0.10/30']
+- endpoints: ['csr-10:eth1:10.0.0.14/30', 'vmx-6:eth2:10.0.0.13/30']
+- endpoints: ['vmx-6:eth3:10.0.0.17/30', 'csr-9:eth1:10.0.0.18/30']
+- endpoints: ['vmx-8:eth1:10.0.0.22/30', 'csr-9:eth2:10.0.0.21/30']
+- endpoints: ['vmx-5:eth1:10.0.0.26/30', 'csr-7:eth2:10.0.0.25/30']
+- endpoints: ['vmx-1:eth1:10.0.0.30/30', 'csr-7:eth3:10.0.0.29/30']
+- endpoints: ['csr-10:eth2:10.0.0.33/30', 'vmx-4:eth1:10.0.0.34/30']
+
