@@ -3,11 +3,8 @@ Arbitray network topology builder for network simulations inside Kubernetes. Ana
 
 ## TODO
 
-0. Installation instructions
-1. Add more examples
-2. Add logging
-3. Save/archive action for device configs
-4. Arbitrary port number publishing
+1. Add logging
+2. Save/archive action for device configs
 
 ## Local installation
 
