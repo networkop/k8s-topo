@@ -28,7 +28,7 @@ VMX_IMAGE = 'vrnetlab/vr-vmx:17.2R1.13'
 CSR_IMAGE = 'vrnetlab/vr-csr:16.04.01'
 XRV_IMAGE = 'vrnetlab/vr-xrv:6.1.2'
 CONF_DIR = './config'
-PUBLISH_BASE = 30000
+PUBLISH_BASE = 30001
 ENABLE_IP_FORWARDING = True
 WAIT_FOR_RUNNING = 20
 
@@ -566,7 +566,7 @@ def main():
         # Single mapping of inside 443 to outside PUBLISH_BASE+index
         if PUBLISH_BASE and (type(PUBLISH_BASE) == int):
             base = int(PUBLISH_BASE)
-            if 30100 <= base <= 32767: # Hardcoding default nodeport range 30000-32767 (offset by 100 to not clash with k8s-topo port)
+            if 30001 <= base <= 32767: # Hardcoding default nodeport range 30000-32767 (offset by 1 to not clash with k8s-topo port)
                 for idx,name in enumerate(sorted(device_names)):
                     # Default is to publish port TCP/443
                     devices[name].create_service(443,base+idx+443)
@@ -574,9 +574,9 @@ def main():
         # The second case is when PUBLISH_BASE is a dict, in which case
         # Each element is a mapping: INTERNAL:EXTERNAL, where
         # INTERNAL is an INTEGER, e.g. 22 and
-        # EXTERNAL is an INTEGER, e.g. 30100, must be in range (30000+100)-32767
-        # Example: PUBLISH_BASE: {22:30100,443:30200}
-        # Note that we're not checking there's no clash between different nodeports
+        # EXTERNAL is an INTEGER, e.g. 30001, must be in range (30000+1)-32767
+        # Example: publish_base: {22:30001,443:30200}
+        # Note that we're not checking there's no clash between different nodeport ranges
         elif type(PUBLISH_BASE) == dict:
             for inside,outside in PUBLISH_BASE.items():
                 LOG.debug("Publish internal port {} -> {} (type {})".format(inside, outside, type(outside)))
@@ -628,7 +628,7 @@ def main():
         LOG.info("D3 graph created")
         import socket
         my_ip = socket.gethostbyname(socket.gethostname())
-        LOG.info(f"URL: http://{my_ip}:32080")
+        LOG.info(f"URL: http://{my_ip}:30000")
     
     return 0
 
