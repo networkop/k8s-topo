@@ -5,6 +5,7 @@ Arbitray network topology builder for network simulations inside Kubernetes. Ana
 
 1. Add logging
 2. Save/archive action for device configs
+3. Too many values are hard-coded like cpu/ram requests for different images. Need to expose all of them and make them configurable through external files/variables
 
 ## Local installation
 

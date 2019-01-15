@@ -99,6 +99,13 @@ export CSR_IMAGE=$(kubectl get service docker-registry -o json | jq -r '.spec.cl
 
 
 
+vi ~/.ssh/config
+Host *
+  StrictHostKeyChecking no
+  UserKnownHostsFile=/dev/null
+
+
+
 
 docker rmi -f $(docker images "10.233.20.34:5000/vr-vmx*" -q)
 
