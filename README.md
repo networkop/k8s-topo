@@ -206,7 +206,7 @@ Generate a random 20-node cEOS topology
 
 
 ```
-./examples/builder/builder --prefix sw 20 0
+./examples/builder/builder 20 0 --prefix sw
 ```
 
 Create the topology (takes about 2 minutes)

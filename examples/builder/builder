@@ -111,9 +111,9 @@ def parse_args():
     )   
     parser.add_argument(                                                                             
         "--prefix",                                                                                       
-        help='Device hostname prefix',
-        type=str,
-        default='qrtr'                                                                   
+        help='Device hostname prefix list',
+        nargs='+',
+        default=['qrtr']                                                                 
     )                          
     args = parser.parse_args()
     return args
@@ -146,9 +146,11 @@ def main():
     # Initialise ip ranges
     infra_range = Network([INFRA_RANGE], 30)
 
+    # Initialise prefixes
+    prefixes = [prefix[i % len(prefix)] for i in range(num)]
 
     # Initialise list of devices
-    devices = [Device(x, prefix=prefix) for x in range(num)]
+    devices = [Device(x, prefix=prefixes[x]) for x in range(num)]
     S = set([d.idx for d in devices])
     T = set([])
     my_idx = random.sample(S, 1).pop()
