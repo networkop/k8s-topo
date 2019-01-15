@@ -53,7 +53,7 @@ git clone --depth 1 https://github.com/networkop/vrnetlab.git
 Copy XRV/VMX image into vrnetlab/xrv and do 
 
 ```
-make
+make docker-image
 ```
 
 setup a k8s-topo and a private docker registry
@@ -76,26 +76,31 @@ echo $REGISTRY
 Push the image into docker registry
 
 ```
-docker image tag vrnetlab/vr-xrv:6.1.2 $REGISTRY/vr-xrv:6.1.2
-docker push $REGISTRY/vr-xrv:6.1.2
+docker image tag vrnetlab/vr-xrv:6.1.3 $REGISTRY/vr-xrv:6.1.3
+docker push $REGISTRY/vr-xrv:6.1.3
 docker image tag vrnetlab/vr-vmx:17.2R1.13 $REGISTRY/vr-vmx:17.2R1.13
 docker push $REGISTRY/vr-vmx:17.2R1.13
+docker image tag  vrnetlab/vr-csr:16.04.01 $REGISTRY/vr-csr:16.04.01
+docker push $REGISTRY/vr-csr:16.04.01
 ```
 
 check that images are in the repo
 
 curl -X GET http://$REGISTRY/v2/_catalog
-{"repositories":["vr-vmx","vr-xrv"]}
+{"repositories":["vr-csr","vr-vmx","vr-xrv"]}
+
 
 
 
 now create pointers to those images (from inside k8s-topo pod)
-export XRV_IMAGE=10.233.20.34:5000/vr-xrv:6.1.2
-export VMX_IMAGE=10.233.20.34:5000/vr-vmx:17.2R1.13
+export XRV_IMAGE=$(kubectl get service docker-registry -o json | jq -r '.spec.clusterIP'):5000/vr-xrv:6.1.3
+export VMX_IMAGE=$(kubectl get service docker-registry -o json | jq -r '.spec.clusterIP'):5000/vr-vmx:17.2R1.13
+export CSR_IMAGE=$(kubectl get service docker-registry -o json | jq -r '.spec.clusterIP'):5000/vr-csr:16.04.01
 
 
 
 
+docker rmi -f $(docker images "10.233.20.34:5000/vr-vmx*" -q)
 
 
 

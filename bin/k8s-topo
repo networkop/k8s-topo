@@ -207,6 +207,7 @@ class Device(object):
         self.outside = 'Unset'
         self.config_present = True
         self.namespace = 'default'
+        self.constraints = None
         # pointer to a k8s pod
         self.pod = None
         # Path to mount configuration files
@@ -352,9 +353,22 @@ class Device(object):
             init_container.image_pull_policy = "IfNotPresent"
             init_container.command           = ["sh", "-c", f"sleep {self.sleep}"]
 
-            #container.init_containers = [init_container]
-            #resource_requirements = client.V1ResourceRequirements(limits={"cpu":"0.5"})
-            #container.resources = resource_requirements
+            # Setting resource requests
+            if self.constraints:
+                requests = dict()
+                limits = dict()
+                cpu_requests = self.constraints.get("cpu", None)
+                cpu_limits = 2 * cpu_requests
+                memory_requests = self.constraints.get("memory", None)
+                if cpu_requests:
+                    requests["cpu"] = cpu_requests
+                    # Allowing maximum of double the requests CPU time (dunno why, just to try)
+                    limits["cpu"] = str( 2 * float( cpu_requests )) 
+                if memory_requests:
+                    requests["memory"] = memory_requests
+                resource_requirements = client.V1ResourceRequirements(limits=limits, requests=requests)
+                container.resources = resource_requirements
+
             
             sec_context                = client.V1SecurityContext(privileged=True)
             container.security_context = sec_context
@@ -455,6 +469,7 @@ class VMX(Device):
         self.image =  VMX_IMAGE                                
         self.type = 'vmx'                                       
         self.args = ['--meshnet', '--trace']
+        self.constraints = {"cpu": "2", "memory": "5Gi"}
 
     def update_entry(self):
         self.entry_cmd = f'ssh -p {self.outside} vrnetlab@localhost'
@@ -465,6 +480,7 @@ class CSR(Device):
         self.image =  CSR_IMAGE                                
         self.type = 'csr'                                       
         self.args = ['--password','vrnetlab','--meshnet']
+        self.constraints = {"cpu": "0.5", "memory": "3Gi"}
 
     def update_entry(self):
         self.entry_cmd = f'ssh -p {self.outside} vrnetlab@localhost'                            

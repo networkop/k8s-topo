@@ -77,6 +77,8 @@ This registry and cEOS image can now be used in the examples below
 
 Working K8s cluster with meshnet-CNI and externally accessible private etcd cluster. Refer to [meshnet-cni][meshnet-cni] for setup scripts.
 
+To use [vrnetlab] images, refer to this [guide](./vrnetlab.md)
+
 ## 3-node alpine linux topology
 
 Topology definition file (alpine image is used whenever string `host` is matched in device name)
@@ -286,3 +288,4 @@ ETCDCTL_API=3 etcdctl --endpoints=$ENDPOINTS get --prefix=true "/sw-9"
 ```
 
 [meshnet-cni]: https://github.com/networkop/meshnet-cni
+[vrnetlab]: https://github.com/plajjan/vrnetlab
