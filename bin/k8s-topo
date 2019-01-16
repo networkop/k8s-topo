@@ -305,7 +305,7 @@ class Device(object):
         bridges = [x for x in result.split('\n') if x]
         for bridge in bridges:
             lldp_enable = f"echo 16384 > /sys/class/net/{bridge}/bridge/group_fwd_mask"
-            self._exec_command([lldp_enable])
+            self._exec_command(["bin/sh", "-c", lldp_enable])
         return True
 
     def expand_links(self):
