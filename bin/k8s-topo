@@ -373,7 +373,7 @@ class Device(object):
             # Setting pod anti-affinity (to spread them across nodes more evenly)
             label_selector_requirement = client.V1LabelSelectorRequirement(key='topo', operator='In', values = [self.topo])
             label_selector  = client.V1LabelSelector()
-            label_selector.match_expressions = label_selector_requirement
+            label_selector.match_expressions = [label_selector_requirement]
             pod_affinity_term = client.V1PodAffinityTerm(label_selector=label_selector, topology_key='kubernetes.io/hostname')
             pod_affinity_term_weighted = client.V1WeightedPodAffinityTerm(pod_affinity_term=pod_affinity_term, weight=100)
             pod_anti_affinity = client.V1PodAntiAffinity(preferred_during_scheduling_ignored_during_execution=[pod_affinity_term_weighted])
