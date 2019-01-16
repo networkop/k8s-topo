@@ -465,6 +465,7 @@ class Quagga(Device):
 class XRV(Device):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.sleep += 10
         self.image =  XRV_IMAGE
         self.type = 'xrv'
         self.args = ['--meshnet', '--trace']
@@ -476,6 +477,7 @@ class XRV(Device):
 class VMX(Device):                        
     def __init__(self, *args, **kwargs):                       
         super().__init__(*args, **kwargs) 
+        self.sleep += 10
         self.image =  VMX_IMAGE                                
         self.type = 'vmx'                                       
         self.args = ['--meshnet', '--trace']
@@ -487,6 +489,7 @@ class VMX(Device):
 class CSR(Device):                        
     def __init__(self, *args, **kwargs):                       
         super().__init__(*args, **kwargs) 
+        self.sleep += 10
         self.image =  CSR_IMAGE                                
         self.type = 'csr'                                       
         self.args = ['--meshnet']
