@@ -193,6 +193,7 @@ def delayed_start(devices, step = 15, base = 45):
 
 class Device(object):
     def __init__(self, name):
+        self.topo = "meshnet" # TODO: change this to be a common pod prefix
         self.name = name
         self.type = ''
         self.interfaces = dict()
@@ -370,8 +371,7 @@ class Device(object):
                 container.resources = resource_requirements
 
             # Setting pod anti-affinity (to spread them across nodes more evenly)
-            value = self.name.split('-')[0]
-            label_selector_requirement = client.V1LabelSelectorRequirement(key='app', operator='In', values = [value])
+            label_selector_requirement = client.V1LabelSelectorRequirement(key='topo', operator='In', values = [self.topo])
             label_selector  = client.V1LabelSelector()
             label_selector.match_expressions = label_selector_requirement
             pod_affinity_term = client.V1PodAffinityTerm(label_selector=label_selector, topology_key='kubernetes.io/hostname')
@@ -399,7 +399,7 @@ class Device(object):
             spec.init_containers = [init_container]
             pod=client.V1Pod()
             pod.metadata=client.V1ObjectMeta(name=self.name, 
-                                             labels={ "app": self.name })
+                                             labels={ "app" : self.name, "topo": self.topo })
             pod.spec = spec
             return K8S.create_namespaced_pod(namespace=self.namespace, 
                                              body=pod)
