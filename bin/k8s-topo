@@ -63,6 +63,11 @@ def parse_args():
         action="store_true"
     )
     main_group.add_argument(
+        "--lldp",
+        help="Enable LLDP forwarding for vrnetlab devices",
+        action="store_true"
+    )
+    main_group.add_argument(
         "--graph",
         help="Generate a D3 graph",
         action="store_true"
@@ -291,6 +296,17 @@ class Device(object):
         LOG.debug(f"Enabling ip forwarding for {self.name}")
         command = ["bin/sh", "-c", "sysctl -w net.ipv4.ip_forward=1"]
         return self._exec_command(command)
+
+    def enable_lldp_forwarding(self):
+        LOG.debug(f"Enabling LLDP forwarding for {self.name}")
+        remount_sys = ["bin/sh", "-c", "mount -o ro,remount /sys; mount -o rw,remount /sys"]
+        self._exec_command(remount_sys)
+        result = self._exec_command(["bin/sh", "-c", "ls /sys/class/net/ | grep br-"])
+        bridges = [x for x in result.split('\n') if x]
+        for bridge in bridges:
+            lldp_enable = f"echo 16384 > /sys/class/net/{bridge}/bridge/group_fwd_mask"
+            self._exec_command([lldp_enable])
+        return 0
 
     def expand_links(self):
         for interface, link in self.interfaces.items():
@@ -522,6 +538,7 @@ def main():
     show    = args.show
     graph   = args.graph
     eif     = args.eif
+    lldp    = args.lldp
     t_file  = os.path.join(os.getcwd(), args.topology)
     t_file_pwd = os.path.split(args.topology)[0]
 
@@ -635,6 +652,18 @@ def main():
                 enabled = [device.enable_ip_forwarding() == expected for  _,device in devices.items() if device.type == 'ceos']
                 if all(enabled):
                     LOG.info("All cEOS pods have IP forwarding enabled")
+                    break
+    # Enabling LLDP forwarding inside vrnetlab devices
+    elif lldp:
+        for _ in range(WAIT_FOR_RUNNING):
+            running = [device.get_status() == 'Running' for _, device in devices.items() if device.type in ['xrv', 'vmx', 'csr']]
+            if not(all(running)):
+                time.sleep(1)
+            else:
+                LOG.info("All pods are running, trying to enable LLDP forwarding for vrnetlab pods")
+                enabled = [device.enable_lldp_forwarding() for  _,device in devices.items() if device.type in ['xrv', 'vmx', 'csr']]
+                if all(enabled):
+                    LOG.info("All vrnetlab pods have LLDP forwarding enabled")
                     break
     elif graph:
         create_d3_graph(devices, links)
