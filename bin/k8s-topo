@@ -457,7 +457,7 @@ class XRV(Device):
         super().__init__(*args, **kwargs)
         self.image =  XRV_IMAGE
         self.type = 'xrv'
-        self.args = ['--password','vrnetlab','--meshnet', '--trace']
+        self.args = ['--meshnet', '--trace']
 
     def update_entry(self):
         self.entry_cmd = f'ssh -p {self.outside} vrnetlab@localhost'
@@ -469,7 +469,7 @@ class VMX(Device):
         self.image =  VMX_IMAGE                                
         self.type = 'vmx'                                       
         self.args = ['--meshnet', '--trace']
-        self.constraints = {"cpu": "2", "memory": "5Gi"}
+        self.constraints = {"cpu": "1", "memory": "5Gi"}
 
     def update_entry(self):
         self.entry_cmd = f'ssh -p {self.outside} vrnetlab@localhost'
@@ -479,7 +479,7 @@ class CSR(Device):
         super().__init__(*args, **kwargs) 
         self.image =  CSR_IMAGE                                
         self.type = 'csr'                                       
-        self.args = ['--password','vrnetlab','--meshnet']
+        self.args = ['--meshnet']
         self.constraints = {"cpu": "0.5", "memory": "3Gi"}
 
     def update_entry(self):
