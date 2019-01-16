@@ -306,7 +306,7 @@ class Device(object):
         for bridge in bridges:
             lldp_enable = f"echo 16384 > /sys/class/net/{bridge}/bridge/group_fwd_mask"
             self._exec_command([lldp_enable])
-        return 0
+        return True
 
     def expand_links(self):
         for interface, link in self.interfaces.items():
