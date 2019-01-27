@@ -464,6 +464,7 @@ class CEOS(Device):
         self.entry_cmd = f"kubectl exec -it {self.name} Cli"
         self.conf_path = "/mnt/flash"
         self.startup_file = "startup-config"
+        self.constraints = {"cpu": "0.5", "memory": "1Gi"}
                 
 class Host(Device):
     def __init__(self, *args, **kwargs):
