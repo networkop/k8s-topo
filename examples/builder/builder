@@ -43,18 +43,22 @@ class Device(object):
         self.intf_num += 1
         return intf_name 
 
-    def connect(self, peer, link_prefix):
+    def connect(self, peer, link_prefix, my_ip, peer_ip):
         my_intf = self.get_next_intf()
         peer_intf = peer.get_next_intf()
         self.peers[my_intf] = {
             "peer_name": peer.name,
             "peer_intf": peer_intf,
-            "link_prefix": link_prefix
+            "link_prefix": link_prefix,
+            "my_ip": my_ip,
+            "peer_ip": peer_ip
         }    
         peer.peers[peer_intf] = {
             "peer_name": self.name,
             "peer_intf": my_intf,
-            "link_prefix": link_prefix
+            "link_prefix": link_prefix,
+            "my_ip": peer_ip,
+            "peer_ip": my_ip
         }
         return my_intf, peer_intf
 
@@ -80,7 +84,7 @@ class Device(object):
         interfaces = []
         for my_intf,link in self.peers.items():
             interfaces.append(f"interface {my_intf}")
-            interfaces.append(f"   ip address {link['link_prefix']}.{my_idx}/24")
+            interfaces.append(f"   ip address {link['my_ip']}/{link['link_prefix'].prefixlen}")
             interfaces.append("   mtu 1300")
             interfaces.append("   no switchport")
             interfaces.append("   exit")
@@ -170,7 +174,7 @@ def main():
             #link_prefix = f"10.{link_num[0]}.{link_num[1]}"   
             link_prefix = infra_range.next()
 
-            my_intf, peer_intf = my_device.connect(peer_device, link_prefix)
+            my_intf, peer_intf = my_device.connect(peer_device, link_prefix, link_prefix[1], link_prefix[2])
 
             #my_ip = f"{link_prefix}.{my_idx+1}/24"
             #peer_ip = f"{link_prefix}.{peer_idx+1}/24"
@@ -199,7 +203,7 @@ def main():
         link_prefix = infra_range.next()
         if link_prefix in ip_links:
             continue
-        my_intf, peer_intf =my_device.connect(peer_device, link_prefix)
+        my_intf, peer_intf =my_device.connect(peer_device, link_prefix, link_prefix[1], link_prefix[2])
         #my_ip = f"{link_prefix}.{my_device.idx+1}/24"
         #peer_ip = f"{link_prefix}.{peer_device.idx+1}/24"
         my_ip = f"{link_prefix[1]}/{link_prefix.prefixlen}"
