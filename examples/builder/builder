@@ -32,8 +32,9 @@ class Device(object):
 
     def __init__(self, idx, prefix):
         self.prefix = prefix
-        self.name = f'{self.prefix}-{idx+1}'
         self.idx = idx
+        self.loopback = LOOPBACK_IPS.next()
+        self.name = f'{self.prefix}-{self.loopback}'
         self.intf_num = 1
         self.peers = dict()
 
@@ -78,7 +79,7 @@ class Device(object):
         "!"]
         loopback = [f"interface {loopback}",
         #f"   ip address 198.51.100.{my_idx}/32",
-        f"   ip address {LOOPBACK_IPS.next()}",
+        f"   ip address {self.loopback}",
         "   exit",
         "!"]
         interfaces = []
