@@ -34,7 +34,7 @@ class Device(object):
         self.prefix = prefix
         self.idx = idx
         self.loopback = LOOPBACK_IPS.next()
-        self.name = f'{self.prefix}-{self.loopback}'
+        self.name = f'{self.prefix}-{self.loopback.ip}'.replace('.','-')
         self.intf_num = 1
         self.peers = dict()
 

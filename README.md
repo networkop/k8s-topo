@@ -229,14 +229,14 @@ Generate the topology graph
 ```
 ./bin/k8s-topo --graph examples/builder/random.yml
 INFO:__main__:D3 graph created
-INFO:__main__:URL: http://10.83.30.251:32080
+INFO:__main__:URL: http://10.83.30.251:30000
 ```
 
 Check connectivity
 
 ```
 /k8s-topo # kubectl exec -it sw-1 bash
-/ # for i in `seq 1 20`; do ping -c 1 -W 1 198.51.100.$i|grep loss; done
+/ # for i in `seq 0 20`; do echo "192.0.2.$i =>"  $(ping -c 1 -W 1 192.0.2.$i|grep loss); done
 1 packets transmitted, 1 packets received, 0% packet loss
 ```
 
@@ -246,26 +246,28 @@ Destroy the topology
 ./bin/k8s-topo --destroy examples/builder/random.yml
 ```
 
-## 200-node random Quagga router topology
+## 750-node random Quagga router topology
 
-Generate a random 200-node network topology with 1000 links
+> Note: max limit is 768 nodes, based on the available address space [reserved for documentation](https://tools.ietf.org/html/rfc5737) - '192.0.2.0/24', '198.51.100.0/24', '203.0.113.0/24'
+
+Generate a random 750-node network topology
 
 ```
-./examples/builder/builder 200 801
-Total number of links generated: 1000
+./examples/builder/builder 750 0
+Total number of links generated: 749
 ```
 
-Create the topology (takes about 20 seconds)
+Create the topology (takes about 2 minutes)
 
 ```
 ./bin/k8s-topo --create examples/builder/random.yml
 ```
 
-Check connectivity
+Check connectivity (repeat for all loopback ranges - '192.0.2.0/24', '198.51.100.0/24', '203.0.113.0/24')
 
 ```
 /k8s-topo # qrtr-143
-/ # for i in `seq 1 200`; do ping -c 1 -W 1 198.51.100.$i|grep loss; done
+/ # for i in `seq 0 255`; do echo "192.0.2.$i =>"  $(ping -c 1 -W 1 192.0.2.$i|grep loss); done
 1 packets transmitted, 1 packets received, 0% packet loss
 ...
 ```
