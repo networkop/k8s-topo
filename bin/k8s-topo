@@ -117,6 +117,8 @@ def parse_endpoints(devices, endpoints, link, idx):
         if not ep:
             LOG.error('Link contains empty definition')
         device_name = ep.pop(0)
+        # stripping domain name from device
+        device_name = device_name.split('.')[0]
         if len(ep) > 1:
             ip = ep.pop()
         else:
@@ -527,7 +529,8 @@ class Generic(Device):
         # Overriding defaults
         self.image = image
         self.type = 'generic'
-        self.entry_cmd = 'kybectl exec -it {} sh'.format(self.name)
+        self.constraints = {"cpu": "1", "memory": "2Gi"}
+        self.entry_cmd = 'kubectl exec -it {} sh'.format(self.name)
 
 
 
