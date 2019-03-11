@@ -312,14 +312,14 @@ class Device(object):
         for interface, link in self.interfaces.items():
             full_link = dict()
             full_link['uid']        = link.vni
-            full_link['local_intf'] = interface
+            full_link['local_intf'] = interface.replace('/','_')
             full_link['local_ip']   = self.ips.get(interface, "")
 
             my_endpoint = (self.name, interface, self.ips.get(interface, ""))
             peer_endpoints = [x for x in link.endpoints if x != my_endpoint]
             peer_name, peer_intf, peer_ip = peer_endpoints.pop(0)
 
-            full_link['peer_intf'] = peer_intf
+            full_link['peer_intf'] = peer_intf.replace('/','_')
             full_link['peer_pod'] = peer_name
             full_link['peer_ip']   = peer_ip
             self.full_links.append(full_link)
