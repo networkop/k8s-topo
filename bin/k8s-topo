@@ -585,7 +585,7 @@ def main():
     XRV_IMAGE  = t_yml.get('XRV_IMAGE',os.getenv('XRV_IMAGE', XRV_IMAGE))
     CSR_IMAGE  = t_yml.get('CSR_IMAGE',os.getenv('CSR_IMAGE', CSR_IMAGE))
     CONF_DIR   = t_yml.get('conf_dir', os.getenv('CONF_DIR', t_file_pwd))
-    CUSTOM_IMAGE = t_yml.get('CUSTOM_IMAGE',os.getenv('CUSTOM_IMAGE', CUSTOM_IMAGE))
+    CUSTOM_IMAGE = t_yml.get('custom_image',os.getenv('custom_image', CUSTOM_IMAGE))
     PUBLISH_BASE = t_yml.get('publish_base', os.getenv('PUBLISH_BASE', PUBLISH_BASE))
     delay = t_yml.get('delay', os.getenv('delay', False))
 
