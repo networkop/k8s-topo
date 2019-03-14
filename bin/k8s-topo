@@ -148,6 +148,7 @@ def parse_endpoints(devices, endpoints, link, idx):
         if ip:
             device.add_ip(ip, ep[0])
         int_name = ep.pop()
+        int_name = int_name.replace("Ethernet", "eth")
         # Remember device connections
         device.connect(int_name, link)
         devices[device_name] = device 
@@ -171,7 +172,7 @@ def write_file(filename, text):
 def create_d3_graph(devices, links):
     g = nx.Graph()
     devices_running = [device.get() for _,device in devices.items() if len(device.get()) > 0]
-    devices_sorted  = sorted([device for device,_ in devices.items()])
+    devices_sorted  = sorted([device.lower() for device,_ in devices.items()])
     g.add_nodes_from([(devices_sorted.index(d), dict(name=d)) for d in devices_sorted])
     [ g.add_edge(devices_sorted.index(link.endpoints[0][0]),
                  devices_sorted.index(link.endpoints[1][0]), 
@@ -373,9 +374,9 @@ class Device(object):
             container.image_pull_policy = "IfNotPresent"
 
             init_container                   = client.V1Container(name=f"init-{self.name}")
-            init_container.image             = "alpine"
+            init_container.image             = "networkop/init-wait:latest"
             init_container.image_pull_policy = "IfNotPresent"
-            init_container.command           = ["sh", "-c", f"sleep {self.sleep}"]
+            init_container.command           = [f"{len(self.interfaces)+1}", f"{self.sleep}"]
 
             # Setting resource requests
             if self.constraints:
@@ -529,6 +530,8 @@ class Generic(Device):
         # Overriding defaults
         self.image = image
         self.type = 'generic'
+        self.conf_path = "/mnt/flash"
+        self.startup_file = "startup-config"
         self.constraints = {"cpu": "1", "memory": "2Gi"}
         self.entry_cmd = 'kubectl exec -it {} sh'.format(self.name)
 
