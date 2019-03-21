@@ -1,6 +1,8 @@
 # k8s-topo
 Arbitray network topology builder for network simulations inside Kubernetes. Analogous to [docker-topo](https://github.com/networkop/arista-ceos-topo). Relies on [meshnet CNI][meshnet-cni] plugin.
 
+![](k8s-topo.png)
+
 ## TODO
 
 1. Add logging

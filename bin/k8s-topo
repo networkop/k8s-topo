@@ -376,7 +376,7 @@ class Device(object):
             init_container                   = client.V1Container(name=f"init-{self.name}")
             init_container.image             = "networkop/init-wait:latest"
             init_container.image_pull_policy = "IfNotPresent"
-            init_container.command           = [f"{len(self.interfaces)+1}", f"{self.sleep}"]
+            init_container.args              = [f"{len(self.interfaces)+1}", f"{self.sleep}"]
 
             # Setting resource requests
             if self.constraints:
