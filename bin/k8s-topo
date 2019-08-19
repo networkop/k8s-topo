@@ -4,7 +4,6 @@ import logging
 import yaml
 import netaddr
 import os
-import etcd3
 import json
 from kubernetes import client, config
 from kubernetes.stream import stream
@@ -17,12 +16,19 @@ from networkx.readwrite import json_graph
 LOG = logging.getLogger(__name__)
 
 # Initialise k8s client
-config.load_kube_config()
+try:
+    config.load_incluster_config()
+except:
+    config.load_kube_config()
 K8S = client.CoreV1Api()
+CRD = client.CustomObjectsApi()
+GVR = {
+    "group": "networkop.co.uk",
+    "version": "v1beta1",
+    "plural": "topologies"
+}
 
 # seting up defaults defaults
-ETCD_HOST = "localhost"
-ETCD_PORT = 2379
 CEOS_IMAGE = 'ceos:latest'
 VMX_IMAGE = 'vrnetlab/vr-vmx:17.2R1.13'
 CSR_IMAGE = 'vrnetlab/vr-csr:16.04.01'
@@ -32,6 +38,7 @@ PUBLISH_BASE = 30001
 ENABLE_IP_FORWARDING = True
 WAIT_FOR_RUNNING = 20
 CUSTOM_IMAGE = dict()
+DEFAULT_NAMESPACE = 'default'
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Tool to create network topologies inside k8s")
@@ -220,8 +227,8 @@ class Device(object):
         self.entry_cmd = f"kubectl exec -it {self.name} sh"
         self.outside = 'Unset'
         self.config_present = True
-        self.namespace = 'default'
         self.constraints = None
+        self.namespace = DEFAULT_NAMESPACE
         # pointer to a k8s pod
         self.pod = None
         # Path to mount configuration files
@@ -333,28 +340,46 @@ class Device(object):
             self.full_links.append(full_link)
         return
 
-    def download_from_etcd(self, etcd_host, etcd_port):
-        etcd = etcd3.client(host=etcd_host, port=etcd_port)
-        result = etcd.get(f'/{self.name}/links')
-        LOG.debug(f"Received data from etcd /{self.name}/links: \n{result}")
-        return result
-
-    def upload_to_etcd(self, etcd_host, etcd_port):
+    def upload_to_k8s(self):
+        LOG.debug("Expanding links and uploading to K8s")
         if not self.full_links:
             self.expand_links()
-        etcd = etcd3.client(host=etcd_host, port=etcd_port)
-        etcd.put(f'/{self.name}/links', json.dumps(self.full_links))
-        check = self.download_from_etcd(etcd_host, etcd_port)
-        LOG.debug(f'My full_links: {self.full_links}')
-        # If check[0] is not None
-        if check[0]:
-            return compare_links(json.loads(check[0].decode('utf-8')), self.full_links)
-        return False
+
+        body = {
+            "apiVersion": '/'.join([GVR['group'], GVR['version']]),
+            "kind": "Topology",
+            "metadata": {
+                "name": self.name
+            },
+            "spec": {
+                "links": self.full_links
+            }
+        }
+
+        response = CRD.create_namespaced_custom_object(
+            group=GVR['group'],
+            version=GVR['version'],
+            namespace=self.namespace,
+            plural=GVR['plural'],
+            body=body
+        )
+        LOG.debug(f'Got response: {response}')
+
+        return True
     
-    def delete_from_etcd(self, etcd_host, etcd_port):
-        etcd = etcd3.client(host=etcd_host, port=etcd_port)
-        etcd.delete_prefix(f'/{self.name}')
-        return self.download_from_etcd(etcd_host, etcd_port)[0] is None
+    def delete_from_k8s(self):
+        LOG.debug("Deleting topology from K8s")
+        response = CRD.delete_namespaced_custom_object(
+            group=GVR['group'],
+            version=GVR['version'],
+            name=self.name,
+            namespace=self.namespace,
+            plural=GVR['plural'],
+            body=client.V1DeleteOptions()          
+        )
+        
+        LOG.debug(f"Got response: {response}")
+        return True
 
     def connect(self, interface, link):
         LOG.debug(f'Creating a pointer to link {link.name} for {interface}@{self.name}')
@@ -383,7 +408,6 @@ class Device(object):
                 requests = dict()
                 limits = dict()
                 cpu_requests = self.constraints.get("cpu", None)
-                cpu_limits = 2 * cpu_requests
                 memory_requests = self.constraints.get("memory", None)
                 if cpu_requests:
                     requests["cpu"] = cpu_requests
@@ -575,17 +599,15 @@ def main():
 
     # Loading topology YAML file
     with open(t_file, 'r') as stream:
-        t_yml = yaml.load(stream)
+        t_yml = yaml.safe_load(stream)
     LOG.debug("Loaded topology from YAML file {}\n {}"
-                 .format(t_file, yaml.dump(t_yml)))
+                 .format(t_file, yaml.safe_dump(t_yml)))
     if 'links' not in t_yml:
         LOG.info('"links" dictionary is not found in {}'
                     .format(t_file))
         return 1
 
     # Overriding defaults
-    etcd_host  = t_yml.get('etcd_host', os.getenv('ETCD_HOST', ETCD_HOST))
-    etcd_port  = t_yml.get('etcd_port', os.getenv('ETCD_PORT', ETCD_PORT))
     CEOS_IMAGE = t_yml.get('ceos_image', os.getenv('CEOS_IMAGE', CEOS_IMAGE))
     VMX_IMAGE  = t_yml.get('VMX_IMAGE',os.getenv('VMX_IMAGE', VMX_IMAGE))
     XRV_IMAGE  = t_yml.get('XRV_IMAGE',os.getenv('XRV_IMAGE', XRV_IMAGE))
@@ -604,11 +626,11 @@ def main():
         delayed_start(devices)
 
     if create:
-        uploaded = [bool(device.upload_to_etcd(etcd_host, etcd_port)) for _,device in devices.items()]
+        uploaded = [bool(device.upload_to_k8s()) for _,device in devices.items()]
         if not all(uploaded):
-            LOG.info("Not all data has been uploaded to etcd")
+            LOG.info("Not all topology data has been uploaded")
         else:
-            LOG.info("All data has been uploaded to etcd")
+            LOG.info("All topology data has been uploaded")
 
         created = [bool(device.create()) for _,device  in devices.items()]
         if not all(created):
@@ -656,11 +678,11 @@ def main():
 
         LOG.info(''.join([f"\n unalias {name}" for name in devices.keys()]))
 
-        cleanup =  [bool(device.delete_from_etcd(etcd_host, etcd_port)) for _,device in devices.items()]
+        cleanup =  [bool(device.delete_from_k8s()) for _,device in devices.items()]
         if not all(cleanup):
-            LOG.info("Not all data has been cleaned up in etcd")
+            LOG.info("Not all topology data has been cleaned up")
         else:
-            LOG.info('All data has been cleaned up from etcd')  
+            LOG.info('All topology data has been cleaned up')  
 
     elif show:
         running = [device.get() for _,device in devices.items() if len(device.get()) > 0]
