@@ -2,8 +2,6 @@ FROM alpine
 
 RUN apk add --no-cache quagga
 
-COPY entrypoint.sh /entrypoint.sh
-
-RUN chmod +x /entrypoint.sh
+COPY examples/quagga-rtr/entrypoint.sh /entrypoint.sh
 
 ENTRYPOINT [ "/entrypoint.sh" ]

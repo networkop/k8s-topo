@@ -1,13 +1,7 @@
 # k8s-topo
-Arbitray network topology builder for network simulations inside Kubernetes. Analogous to [docker-topo](https://github.com/networkop/arista-ceos-topo). Relies on [meshnet CNI][meshnet-cni] plugin.
+Arbitrary network topology builder for network simulations inside Kubernetes. Analogous to [docker-topo](https://github.com/networkop/docker-topo). Relies on [meshnet CNI][meshnet-cni] plugin.
 
 ![](k8s-topo.png)
-
-## TODO
-
-1. Add logging
-2. Save/archive action for device configs
-3. Too many values are hard-coded like cpu/ram requests for different images. Need to expose all of them and make them configurable through external files/variables
 
 ## Local installation
 
@@ -19,20 +13,69 @@ pip install git+https://github.com/networkop/k8s-topo.git
 
 ## Hosted K8s installation
 
-Build the docker image and push it to the docker hub.
+The following manifest will install the `k8s-topo` as a deployment inside the Kubernetes cluster and create all the necessary RBAC rules:
 
 ```
-build.sh <dockerhub_username>
+kubectl create -f manifest.yml
 ```
 
-Update the image name in `kube-k8s-topo.yml` to match your dockerhub username and do:
+Connect to the k8s-topo pod to get access to the script:
 
 ```
-kubectl create -f kube-k8s-topo.yml
+kubectl exec -it deployment/k8s-topo sh
+```
+
+# Usage
+
+Create a topology definition file. Example below is for a full-mesh 3-node topology.
+
+```yaml
+links:
+  - endpoints: ["host-1:eth1:12.12.12.1/24", "host-2:eth1:12.12.12.2/24"]
+  - endpoints: ["host-1:eth2:13.13.13.1/24", "host-3:eth1:13.13.13.3/24"]
+  - endpoints: ["host-2:eth2:23.23.23.2/24", "host-3:eth2:23.23.23.3/24"]
+```
+
+Instantiate the topology inside Kubernetes
+
+```bash
+k8s-topo --create examples/3node-host.yml
+```
+
+List all pods in the topology and their respective locations
+
+```
+k8s-topo --show examples/3node-host.yml
+host-1@kind-worker
+host-2@kind-worker2
+host-3@kind-worker2
+```
+
+Test connectivity
+
+```bash
+kubectl exec -it host-1 -- ping -c 1 12.12.12.2
+kubectl exec -it host-1 -- ping -c 1 13.13.13.3
+kubectl exec -it host-2 -- ping -c 1 23.23.23.3
+```
+
+Destroy the topology
+
+```bash
+k8s-topo --destroy examples/3node-host.yml
 ```
 
 # Visualisation
-After the topology has been created, it is possible to view the resulting graph. The `k8s-topo --graph topology_name` command will create a json representation of the topology graph and feed it into a simple D3.js-based web page. This web page, running inside a `k8s-topo` pod, is exposed externally as a NodePort service on port **32080** of every node.
+After the topology has been created, it is possible to view the resulting graph. The `k8s-topo --graph topology_name` command will create a json representation of the topology graph and feed it into a simple D3.js-based web page. 
+
+```
+k8s-topo --graph examples/builder/random.yml 
+INFO:__main__:D3 graph created
+INFO:__main__:URL: http://172.17.0.2:30000
+
+```
+
+This web page, running inside a `k8s-topo` pod, is exposed externally as a NodePort service on port **32000** of every node.
 
 ![](random.png)
 
@@ -78,57 +121,15 @@ This registry and cEOS image can now be used in the examples below
 
 ## Prerequisites
 
-Working K8s cluster with meshnet-CNI and externally accessible private etcd cluster. Refer to [meshnet-cni][meshnet-cni] for setup scripts.
+Working K8s cluster with meshnet-CNI installed is required. Refer to [meshnet-cni][meshnet-cni] for setup scripts.
 
 To use [vrnetlab] images, refer to this [guide](./vrnetlab.md)
-
-## 3-node alpine linux topology
-
-Topology definition file (alpine image is used whenever string `host` is matched in device name)
-
-```yaml
-etcd_port: 32379
-links:
-  - endpoints: ["host-1:eth1:12.12.12.1/24", "host-2:eth1:12.12.12.2/24"]
-  - endpoints: ["host-1:eth2:13.13.13.1/24", "host-3:eth1:13.13.13.3/24"]
-  - endpoints: ["host-2:eth2:23.23.23.2/24", "host-3:eth2:23.23.23.3/24"]
-```
-
-Create the topology
-
-```bash
-./bin/k8s-topo --create examples/3node-host.yml
-```
-
-List all pods in the topology
-
-```
-./bin/k8s-topo --show examples/3node-host.yml
-host-1@node2
-host-2@node2
-host-3@node1
-```
-
-Test connectivity
-
-```bash
-kubectl exec -it host-1 -- ping -c 1 12.12.12.2
-kubectl exec -it host-1 -- ping -c 1 13.13.13.3
-kubectl exec -it host-2 -- ping -c 1 23.23.23.3
-```
-
-Destroy the topology
-
-```bash
-./bin/k8s-topo --destroy examples/3node-host.yml
-```
 
 ## 3-node cEOS topology
 
 Topology definition file (cEOS is stored in a private Docker registry)
 
 ```yaml
-etcd_port: 32379
 conf_dir: ./config-3node
 links:
   - endpoints: ["sw-1:eth1", "sw-2:eth1"]
@@ -139,13 +140,13 @@ links:
 Create the topology
 
 ```bash
-./bin/k8s-topo --create examples/3node-ceos.yml
+k8s-topo --create examples/3node-ceos.yml
 ```
 
 List all pods in the topology
 
 ```bash
-./bin/k8s-topo --show examples/3node-ceos.yml
+k8s-topo --show examples/3node-ceos.yml
 sw-1@node1
 sw-2@node1
 sw-3@node1
@@ -196,7 +197,7 @@ sw-1#
 Destroy the topology
 
 ```bash
-./bin/k8s-topo --destroy examples/3node-ceos.yml
+k8s-topo --destroy examples/3node-ceos.yml
 INFO:__main__:All pods have been destroyed successfully
 INFO:__main__:
 unalias sw-1
@@ -217,19 +218,19 @@ Generate a random 20-node cEOS topology
 Create the topology (takes about 2 minutes)
 
 ```
-./bin/k8s-topo --create examples/builder/random.yml
+k8s-topo --create examples/builder/random.yml
 ```
 
 Enable ip forwarding inside cEOS containers
 
 ```
-./bin/k8s-topo --eif examples/builder/random.yml
+k8s-topo --eif examples/builder/random.yml
 ```
 
 Generate the topology graph
 
 ```
-./bin/k8s-topo --graph examples/builder/random.yml
+k8s-topo --graph examples/builder/random.yml
 INFO:__main__:D3 graph created
 INFO:__main__:URL: http://10.83.30.251:30000
 ```
@@ -237,20 +238,21 @@ INFO:__main__:URL: http://10.83.30.251:30000
 Check connectivity
 
 ```
-/k8s-topo # kubectl exec -it sw-1 bash
-/ # for i in `seq 0 20`; do echo "192.0.2.$i =>"  $(ping -c 1 -W 1 192.0.2.$i|grep loss); done
+19/k8s-topo # kubectl exec -it sw-1 bash
+/ # export PREFIX=192.0.2
+/ # for i in `seq 0 19`; do echo "${PREFIX}.$i =>"  $(ping -c 1 -W 1 ${PREFIX}.$i|grep loss); done
 1 packets transmitted, 1 packets received, 0% packet loss
 ```
 
 Destroy the topology
 
 ```bash
-./bin/k8s-topo --destroy examples/builder/random.yml
+k8s-topo --destroy examples/builder/random.yml
 ```
 
 ## 750-node random Quagga router topology
 
-> Note: max limit is 768 nodes, based on the available address space [reserved for documentation](https://tools.ietf.org/html/rfc5737) - '192.0.2.0/24', '198.51.100.0/24', '203.0.113.0/24'
+> Note: max limit for random topology builder is 768 nodes, based on the available address space [reserved for documentation](https://tools.ietf.org/html/rfc5737) - '192.0.2.0/24', '198.51.100.0/24', '203.0.113.0/24'
 
 Generate a random 750-node network topology
 
@@ -262,14 +264,15 @@ Total number of links generated: 749
 Create the topology (takes about 2 minutes)
 
 ```
-./bin/k8s-topo --create examples/builder/random.yml
+k8s-topo --create examples/builder/random.yml
 ```
 
 Check connectivity (repeat for all loopback ranges - '192.0.2.0/24', '198.51.100.0/24', '203.0.113.0/24')
 
 ```
 /k8s-topo # qrtr-143
-/ # for i in `seq 0 255`; do echo "192.0.2.$i =>"  $(ping -c 1 -W 1 192.0.2.$i|grep loss); done
+/ # export PREFIX=192.0.2
+/ # for i in `seq 0 255`; do echo "${PREFIX}.$i =>"  $(ping -c 1 -W 1 ${PREFIX}.$i|grep loss); done
 1 packets transmitted, 1 packets received, 0% packet loss
 ...
 ```
@@ -277,20 +280,10 @@ Check connectivity (repeat for all loopback ranges - '192.0.2.0/24', '198.51.100
 Destroy the topology
 
 ```bash
-./bin/k8s-topo --destroy examples/builder/random.yml
+k8s-topo --destroy examples/builder/random.yml
 ```
 
 
-# Troubleshooting
-
-## Check the contents of etcd database
-
-```
-ETCD_HOST=$(kubectl get service etcd-client -o json |  jq -r '.spec.clusterIP')
-ENDPOINTS=$ETCD_HOST:2379
-ETCDCTL_API=3 etcdctl --endpoints=$ENDPOINTS get --prefix=true ""
-ETCDCTL_API=3 etcdctl --endpoints=$ENDPOINTS get --prefix=true "/sw-9"
-```
 
 [meshnet-cni]: https://github.com/networkop/meshnet-cni
 [vrnetlab]: https://github.com/plajjan/vrnetlab
