@@ -1,4 +1,3 @@
-etcd_port: 32379
 publish_base:
   22: 30100
 links:

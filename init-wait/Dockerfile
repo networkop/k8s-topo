@@ -1,4 +1,4 @@
 FROM alpine:latest
-COPY entrypoint.sh /
+COPY init-wait/entrypoint.sh /
 ENTRYPOINT [ "/entrypoint.sh" ]
 CMD []
