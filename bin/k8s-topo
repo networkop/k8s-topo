@@ -144,6 +144,8 @@ def parse_endpoints(devices, endpoints, link, idx):
             device = devices.get(device_name, VMX(device_name))
         elif 'csr' in device_name.lower():
             device = devices.get(device_name, CSR(device_name))
+        elif 'phy' in device_name.lower():
+            device = devices.get(device_name, PHY(device_name))
         elif any(image in device_name.lower() for image in CUSTOM_IMAGE.keys()):
             image_name = [CUSTOM_IMAGE[image] for image in CUSTOM_IMAGE.keys() if image in device_name.lower()][0]
             device = devices.get(device_name, Generic(device_name, image=image_name))
@@ -539,6 +541,16 @@ class VMX(Device):
     def update_entry(self):
         self.entry_cmd = f'ssh -p {self.outside} vrnetlab@localhost'
 
+
+class PHY(Device):
+    """
+    Class representing a physical device (rather than virtual).
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'phy'
+
+
 class CSR(Device):                        
     def __init__(self, *args, **kwargs):                       
         super().__init__(*args, **kwargs) 
@@ -639,7 +651,7 @@ def main():
         else:
             LOG.info("All topology data has been uploaded")
 
-        created = [bool(device.create()) for _,device  in devices.items()]
+        created = [bool(device.create()) for _,device  in devices.items() if 'phy' not in device.name]
         if not all(created):
             LOG.info("Not all pods have been created")
         else:
@@ -672,7 +684,6 @@ def main():
                     if type(inside) == int and type(outside) == int:
                         nodeport = outside + idx
                     devices[name].create_service(inside,nodeport)
-        
 
         LOG.info(''.join([f"\n alias {name}='{device.entry_cmd}'" for (name, device) in devices.items()]))
            
@@ -685,7 +696,7 @@ def main():
 
         LOG.info(''.join([f"\n unalias {name}" for name in devices.keys()]))
 
-        cleanup =  [bool(device.delete_from_k8s()) for _,device in devices.items()]
+        cleanup =  [bool(device.delete_from_k8s()) for _,device in devices.items() if 'phy' not in device.name]
         if not all(cleanup):
             LOG.info("Not all topology data has been cleaned up")
         else:
