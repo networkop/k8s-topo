@@ -16,7 +16,7 @@ pip install git+https://github.com/networkop/k8s-topo.git
 The following manifest will install the `k8s-topo` as a deployment inside the Kubernetes cluster and create all the necessary RBAC rules:
 
 ```
-kubectl create -f manifest.yml
+kubectl create -f https://raw.githubusercontent.com/networkop/k8s-topo/master/manifest.yml
 ```
 
 Connect to the k8s-topo pod to get access to the script:
