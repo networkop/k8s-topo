@@ -1,5 +1,5 @@
 # k8s-topo
-Arbitrary network topology builder for network simulations inside Kubernetes. Analogous to [docker-topo](https://github.com/networkop/docker-topo). Relies on [meshnet CNI][meshnet-cni] plugin.
+Arbitrary network topology builder for network simulations inside Kubernetes. Analogous to [docker-topo](https://github.com/networkop/docker-topo). Relies on either [meshnet CNI][meshnet-cni] plugin (default) or [Network Service Mesh](#network-service-mesh).
 
 ![](k8s-topo.png)
 
@@ -80,6 +80,29 @@ This web page, running inside a `k8s-topo` pod, is exposed externally as a NodeP
 ![](random.png)
 
 The colour of vertices represent the node the pod is running on. In this case the topology is spread across 4 different nodes.
+
+# Network Service Mesh
+
+By default all pod connectivity is setup by the [meshnet][meshnet-cni] CNI plugin. Alternatively, connectivity can be setup at runtime by [NSM][nsm]. You first would need to install NSM:
+
+```bash
+git clone https://github.com/networkservicemesh/networkservicemesh
+cd networkservicemesh
+make helm-init
+SPIRE_ENABLED=false INSECURE=true FORWARDING_PLANE=kernel make helm-install-nsm 
+```
+
+Once installed, any topology definition file can be made "nsm-compliant" by adding a `nsm: true` flag to the top of the file, e.g.:
+
+```yaml
+nsm: true
+links:
+  - endpoints: ["qrtr-1:eth12", "qrtr-2:eth21"]
+```
+
+See [nsm-5node.yml](examples/nsm-5node.yml) for another example.
+
+
 
 # Private docker registry setup
 
@@ -287,3 +310,4 @@ k8s-topo --destroy examples/builder/random.yml
 
 [meshnet-cni]: https://github.com/networkop/meshnet-cni
 [vrnetlab]: https://github.com/plajjan/vrnetlab
+[nsm]: https://github.com/networkservicemesh/networkservicemesh

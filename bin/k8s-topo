@@ -449,12 +449,12 @@ class Device(object):
             nsm_limits["networkservicemesh.io/socket"] = "1"
             resource_requirements = client.V1ResourceRequirements(limits=nsm_limits)
             nsc_container.resources = resource_requirements
-            nse_container.resources = resource_requirements
 
             # nse-sidecar container            
             nse_container = client.V1Container(name="nse-sidecar")
             nse_container.image = "networkservicemesh/topology-sidecar-nse:latest"
             nse_container.image_pull_policy = "IfNotPresent"
+            nse_container.resources = resource_requirements
 
             env_nse_name = client.V1EnvVar(name="ADVERTISE_NSE_NAME", value=self.topo)
             env_nse_label = client.V1EnvVar(name="ADVERTISE_NSE_LABELS", value=f"device={self.name}")

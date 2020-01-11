@@ -1,4 +1,5 @@
 nsm: true
+conf_dir: config-nsm
 links:
   - endpoints: ["qrtr-1:eth12", "qrtr-2:eth21"]
   - endpoints: ["qrtr-2:eth23", "qrtr-3:eth32"]
