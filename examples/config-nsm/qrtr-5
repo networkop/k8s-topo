@@ -1,0 +1,7 @@
+!
+hostname qrtr-5
+!
+interface lo
+  ip address 192.0.2.5/32
+  exit
+!

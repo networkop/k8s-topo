@@ -1,6 +1,6 @@
 VERSION  ?= 0.2.0
 DOCKERID ?= networkop
-KUBECONFIG = $(shell ${GOPATH}/kind get kubeconfig-path --name="kind")
+KUBECONFIG ?= $(shell ${GOPATH}/kind get kubeconfig-path --name="kind")
 GOPATH = ${HOME}/go/bin
 
 export KUBECONFIG
@@ -16,6 +16,9 @@ release:
 
 install: clean
 	kubectl wait --for condition=Ready pod -l name=meshnet -n meshnet   
+	kubectl apply -f manifest.yml
+
+install-nsm: clean
 	kubectl apply -f manifest.yml
 
 clean: 

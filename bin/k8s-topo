@@ -412,7 +412,7 @@ class Device(object):
     def _build_nsurl(self, intf, link):
         peer_endpoints = link.my_peers(self.name, intf)
         _, peer_intf, _, _ = peer_endpoints.pop(0)
-        nsm_url = f"topo/{intf}?link={link.name}&peerintf={peer_intf}"
+        nsm_url = f"{self.topo}/{intf}?link={link.name}&peerif={peer_intf}"
         LOG.debug(f"NSM URL built: {nsm_url}")
         return nsm_url
 
@@ -424,7 +424,7 @@ class Device(object):
         self.configure()
         if not self.get():
             # virtual network device container
-            container                   = client.V1Container(name=self.name)
+            container                   = client.V1Container(name="router")
             container.image             = self.image
             container.command           = self.command
             container.args              = self.args
@@ -445,20 +445,21 @@ class Device(object):
             )
             nsc_container.env = [env_nsm_io]
 
+            nsm_limits = dict()
+            nsm_limits["networkservicemesh.io/socket"] = "1"
+            resource_requirements = client.V1ResourceRequirements(limits=nsm_limits)
+            nsc_container.resources = resource_requirements
+            nse_container.resources = resource_requirements
+
             # nse-sidecar container            
             nse_container = client.V1Container(name="nse-sidecar")
             nse_container.image = "networkservicemesh/topology-sidecar-nse:latest"
             nse_container.image_pull_policy = "IfNotPresent"
 
-            env_nse_name = client.V1EnvVar(name="ADVERTISE_NSE_NAME", value="topo")
+            env_nse_name = client.V1EnvVar(name="ADVERTISE_NSE_NAME", value=self.topo)
             env_nse_label = client.V1EnvVar(name="ADVERTISE_NSE_LABELS", value=f"device={self.name}")
             env_ip_addr = client.V1EnvVar(name="IP_ADDRESS", value=f"10.60.{self.idx}.0/24")
             nse_container.env = [env_nse_name, env_nse_label, env_ip_addr]
-
-            nse_limits = dict()
-            nse_limits["networkservicemesh.io/socket"] = "1"
-            resource_requirements = client.V1ResourceRequirements(limits=nse_limits)
-            nse_container.resources = resource_requirements
 
             # Volume mounts for primary (device) container
             volume_mount = client.V1VolumeMount(name="startup-config-volume", 
@@ -684,9 +685,11 @@ def upload_nse_to_k8s(links, topology):
         match = dict()
         match["match"] = None
         match["sourceSelector"] = { "link": link.name }
-        match["route"] = dict()
-        match["route"]["destination"] = None
-        match["route"]["destinationSelector"] = { "device": remote_endpoint[0] }
+        match["route"] = list()
+        route = dict()
+        route["destination"] = None
+        route["destinationSelector"] = { "device": remote_endpoint[0] }
+        match["route"].append(route)
         nse_matches.append(match)
     
     body = {

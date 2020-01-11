@@ -1,0 +1,7 @@
+!
+hostname qrtr-3
+!
+interface lo
+  ip address 192.0.2.3/32
+  exit
+!
