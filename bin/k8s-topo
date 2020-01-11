@@ -27,6 +27,12 @@ GVR = {
     "version": "v1beta1",
     "plural": "topologies"
 }
+NSM = {
+    "group": "networkservicemesh.io",
+    "version": "v1alpha1",
+    "plural": "networkservices",
+    "kind": "NetworkService"
+}
 
 # seting up defaults defaults
 CEOS_IMAGE = 'ceos:latest'
@@ -40,6 +46,7 @@ ENABLE_IP_FORWARDING = True
 WAIT_FOR_RUNNING = 20
 CUSTOM_IMAGE = dict()
 DEFAULT_NAMESPACE = 'default'
+ENABLE_NSM = False
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Tool to create network topologies inside k8s")
@@ -212,6 +219,8 @@ def delayed_start(devices, step = 15, base = 45):
 
 
 class Device(object):
+    globalIndex = 0
+
     def __init__(self, name):
         self.topo = PREFIX
         self.orig = name
@@ -235,6 +244,8 @@ class Device(object):
         # Path to mount configuration files
         self.conf_path = "/etc/"
         self.startup_file = "config"
+        self.idx = Device.globalIndex
+        Device.globalIndex += 1
     
     def get(self):
         return K8S.list_namespaced_pod(namespace=self.namespace, 
@@ -331,9 +342,9 @@ class Device(object):
             full_link['local_intf'] = interface.replace('/','_')
             full_link['local_ip']   = self.ips.get(interface, "")
 
-            my_endpoint = (self.name, interface, self.ips.get(interface, ""))
+            my_endpoint = (self.name, interface, self.ips.get(interface, ""), _)
             peer_endpoints = [x for x in link.endpoints if x != my_endpoint]
-            peer_name, peer_intf, peer_ip = peer_endpoints.pop(0)
+            peer_name, peer_intf, peer_ip, _ = peer_endpoints.pop(0)
 
             full_link['peer_intf'] = peer_intf.replace('/','_')
             full_link['peer_pod'] = peer_name
@@ -393,6 +404,86 @@ class Device(object):
         return
 
     def create(self):
+        if ENABLE_NSM:
+            return self.create_nsm()
+        else:
+            return self.create_default()
+
+    def _build_nsurl(self, intf, link):
+        peer_endpoints = link.my_peers(self.name, intf)
+        _, peer_intf, _, _ = peer_endpoints.pop(0)
+        nsm_url = f"topo/{intf}?link={link.name}&peerintf={peer_intf}"
+        LOG.debug(f"NSM URL built: {nsm_url}")
+        return nsm_url
+
+    def _build_nsurls(self):
+        LOG.debug("Building NSM URLs")
+        return [self._build_nsurl(intf, link) for intf, link in self.interfaces.items() if link.is_owner(self.name, intf)]
+
+    def create_nsm(self):
+        self.configure()
+        if not self.get():
+            # virtual network device container
+            container                   = client.V1Container(name=self.name)
+            container.image             = self.image
+            container.command           = self.command
+            container.args              = self.args
+            container.env               = self.environment
+            container.image_pull_policy = "IfNotPresent"
+
+            cap_net_admin = client.V1Capabilities(add=["NET_ADMIN"])
+            sec_context                = client.V1SecurityContext(capabilities=cap_net_admin)
+            container.security_context = sec_context
+
+            # nsc-sidecar container
+            nsc_container = client.V1Container(name="nsc-sidecar")
+            nsc_container.image = "networkservicemesh/topology-sidecar-nsc:latest"
+            nsc_container.image_pull_policy = "IfNotPresent"
+
+            env_nsm_io = client.V1EnvVar(name="NS_NETWORKSERVICEMESH_IO",
+            value=",".join(self._build_nsurls())
+            )
+            nsc_container.env = [env_nsm_io]
+
+            # nse-sidecar container            
+            nse_container = client.V1Container(name="nse-sidecar")
+            nse_container.image = "networkservicemesh/topology-sidecar-nse:latest"
+            nse_container.image_pull_policy = "IfNotPresent"
+
+            env_nse_name = client.V1EnvVar(name="ADVERTISE_NSE_NAME", value="topo")
+            env_nse_label = client.V1EnvVar(name="ADVERTISE_NSE_LABELS", value=f"device={self.name}")
+            env_ip_addr = client.V1EnvVar(name="IP_ADDRESS", value=f"10.60.{self.idx}.0/24")
+            nse_container.env = [env_nse_name, env_nse_label, env_ip_addr]
+
+            nse_limits = dict()
+            nse_limits["networkservicemesh.io/socket"] = "1"
+            resource_requirements = client.V1ResourceRequirements(limits=nse_limits)
+            nse_container.resources = resource_requirements
+
+            # Volume mounts for primary (device) container
+            volume_mount = client.V1VolumeMount(name="startup-config-volume", 
+                                                mount_path=os.path.join(self.conf_path, self.startup_file),
+                                                sub_path=self.startup_file)
+            if self.config_present:
+                container.volume_mounts = [volume_mount]
+
+            cmap   = client.V1ConfigMapVolumeSource(name=f"{self.name}-config")
+            volume = client.V1Volume(name="startup-config-volume", config_map=cmap)
+            
+            # Main pod specification
+            spec=client.V1PodSpec(containers=[container, nsc_container, nse_container])
+            if self.config_present:
+                spec.volumes=[volume]
+            spec.termination_grace_period_seconds = 0
+            pod=client.V1Pod()
+            pod.metadata=client.V1ObjectMeta(name=self.name, 
+                                             labels={ "app" : self.name, "topo": self.topo })
+            pod.spec = spec
+            return K8S.create_namespaced_pod(namespace=self.namespace, 
+                                             body=pod)
+        return False
+
+    def create_default(self):
         self.configure()
         if not self.get():
             container                   = client.V1Container(name=self.name)
@@ -574,12 +665,69 @@ class Link(object):
         self.endpoints = list()
         
     def add_endpoint(self, name, interface, ip):
-        endpoint = (name, interface, ip)
+        endpoint = (name, interface, ip, len(self.endpoints))
         self.endpoints.append(endpoint)
+
+    def my_peers(self, my_name, my_intf):
+        return [x for x in self.endpoints if not (x[0] == my_name and x[1] == my_intf)]
+
+    def is_owner(self, name, intf):
+        my_endpoints = [x for x in self.endpoints if (x[0] == name and x[1] == intf)]
+        endpoint = my_endpoints.pop(0)
+        return endpoint[3] == 0
+
+def upload_nse_to_k8s(links, topology):
+    LOG.debug("Uploading NSE to K8s")
+    nse_matches = list()
+    for link in links:
+        remote_endpoint = [x[0] for x in link.endpoints if x[3] != 0]
+        match = dict()
+        match["match"] = None
+        match["sourceSelector"] = { "link": link.name }
+        match["route"] = dict()
+        match["route"]["destination"] = None
+        match["route"]["destinationSelector"] = { "device": remote_endpoint[0] }
+        nse_matches.append(match)
+    
+    body = {
+        "apiVersion": f"{NSM['group']}/{NSM['version']}",
+        "kind": f"{NSM['kind']}",
+        "metadata": {
+            "name": topology,
+        },
+        "spec": {
+            "payload": "IP",
+            "matches": nse_matches
+        }
+    }
+    response = CRD.create_namespaced_custom_object(
+        group=NSM['group'],
+        version=NSM['version'],
+        namespace=DEFAULT_NAMESPACE,
+        plural=NSM['plural'],
+        body=body
+    )
+    LOG.debug(f'Got response: {response}')
+    
+    return True
+
+def delete_nse_from_k8s(topology):
+    LOG.debug("Deleting NSE from K8s")
+    response = CRD.delete_namespaced_custom_object(
+        group=NSM['group'],
+        version=NSM['version'],
+        name=topology,
+        namespace=DEFAULT_NAMESPACE,
+        plural=NSM['plural'],
+        body=client.V1DeleteOptions()          
+    )
+    
+    LOG.debug(f"Got response: {response}")
+    return True
 
 def main():
     # Initializing main variables
-    global CEOS_IMAGE, CONF_DIR, PUBLISH_BASE, XRV_IMAGE, VMX_IMAGE, CSR_IMAGE, CUSTOM_IMAGE, PREFIX
+    global CEOS_IMAGE, CONF_DIR, PUBLISH_BASE, XRV_IMAGE, VMX_IMAGE, CSR_IMAGE, CUSTOM_IMAGE, PREFIX, ENABLE_NSM
 
     # Assigning arguments
     args    = parse_args()
@@ -614,6 +762,7 @@ def main():
         return 1
 
     # Overriding defaults
+    ENABLE_NSM = t_yml.get('nsm', os.getenv('ENABLE_NSM', ENABLE_NSM))
     CEOS_IMAGE = t_yml.get('ceos_image', os.getenv('CEOS_IMAGE', CEOS_IMAGE))
     VMX_IMAGE  = t_yml.get('VMX_IMAGE',os.getenv('VMX_IMAGE', VMX_IMAGE))
     XRV_IMAGE  = t_yml.get('XRV_IMAGE',os.getenv('XRV_IMAGE', XRV_IMAGE))
@@ -633,7 +782,11 @@ def main():
         delayed_start(devices)
 
     if create:
-        uploaded = [bool(device.upload_to_k8s()) for _,device in devices.items()]
+        LOG.debug("Creating topology CRDs...")
+        if not ENABLE_NSM:
+            uploaded = [bool(device.upload_to_k8s()) for _,device in devices.items()]
+        else:
+            uploaded = [upload_nse_to_k8s(links, PREFIX)]
         if not all(uploaded):
             LOG.info("Not all topology data has been uploaded")
         else:
@@ -685,7 +838,10 @@ def main():
 
         LOG.info(''.join([f"\n unalias {name}" for name in devices.keys()]))
 
-        cleanup =  [bool(device.delete_from_k8s()) for _,device in devices.items()]
+        if not ENABLE_NSM:
+            cleanup =  [bool(device.delete_from_k8s()) for _,device in devices.items()]
+        else:
+            cleanup =  [delete_nse_from_k8s(PREFIX)]
         if not all(cleanup):
             LOG.info("Not all topology data has been cleaned up")
         else:

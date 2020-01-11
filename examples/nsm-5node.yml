@@ -1,0 +1,9 @@
+nsm: true
+links:
+  - endpoints: ["qrtr-1:eth12", "qrtr-2:eth21"]
+  - endpoints: ["qrtr-2:eth23", "qrtr-3:eth32"]
+  - endpoints: ["qrtr-3:eth34", "qrtr-4:eth43"]
+  - endpoints: ["qrtr-4:eth41", "qrtr-1:eth14"]
+  - endpoints: ["qrtr-5:eth51", "qrtr-1:eth15"]
+  - endpoints: ["qrtr-4:eth45", "qrtr-5:eth54"]
+
