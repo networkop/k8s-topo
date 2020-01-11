@@ -472,7 +472,13 @@ class Device(object):
             volume = client.V1Volume(name="startup-config-volume", config_map=cmap)
             
             # Main pod specification
-            spec=client.V1PodSpec(containers=[container, nsc_container, nse_container])
+            containers = [container, nse_container, nsc_container]
+            # Drop NSC if not a client for any link
+            if not self._build_nsurls():
+                containers.pop(2)
+                
+            spec=client.V1PodSpec(containers=containers)
+
             if self.config_present:
                 spec.volumes=[volume]
             spec.termination_grace_period_seconds = 0
