@@ -22,80 +22,56 @@ except:
     config.load_kube_config()
 K8S = client.CoreV1Api()
 CRD = client.CustomObjectsApi()
-GVR = {
-    "group": "networkop.co.uk",
-    "version": "v1beta1",
-    "plural": "topologies"
-}
+GVR = {"group": "networkop.co.uk", "version": "v1beta1", "plural": "topologies"}
 NSM = {
     "group": "networkservicemesh.io",
     "version": "v1alpha1",
     "plural": "networkservices",
-    "kind": "NetworkService"
+    "kind": "NetworkService",
 }
 
 # seting up defaults defaults
-CEOS_IMAGE = 'ceos:latest'
-VMX_IMAGE = 'vrnetlab/vr-vmx:17.2R1.13'
-CSR_IMAGE = 'vrnetlab/vr-csr:16.04.01'
-XRV_IMAGE = 'vrnetlab/vr-xrv:6.1.2'
-CONF_DIR = './config'
-PREFIX = 'meshnet'
+CEOS_IMAGE = "ceos:latest"
+VMX_IMAGE = "vrnetlab/vr-vmx:17.2R1.13"
+CSR_IMAGE = "vrnetlab/vr-csr:16.04.01"
+XRV_IMAGE = "vrnetlab/vr-xrv:6.1.2"
+CONF_DIR = "./config"
+PREFIX = "meshnet"
 PUBLISH_BASE = 30001
 ENABLE_IP_FORWARDING = True
 WAIT_FOR_RUNNING = 20
 CUSTOM_IMAGE = dict()
-DEFAULT_NAMESPACE = 'default'
+DEFAULT_NAMESPACE = "default"
 ENABLE_NSM = False
 
+
 def parse_args():
-    parser = argparse.ArgumentParser(description="Tool to create network topologies inside k8s")
-    parser.add_argument(
-        '-d', '--debug',
-        help='Enable Debug',
-        action='store_true'
+    parser = argparse.ArgumentParser(
+        description="Tool to create network topologies inside k8s"
     )
-    
-    m_group = parser.add_argument_group(title="Actions", description="Create or destroy topology")
+    parser.add_argument("-d", "--debug", help="Enable Debug", action="store_true")
+
+    m_group = parser.add_argument_group(
+        title="Actions", description="Create or destroy topology"
+    )
     main_group = m_group.add_mutually_exclusive_group()
+    main_group.add_argument("--create", help="Create topology", action="store_true")
+    main_group.add_argument("--destroy", help="Destroy topology", action="store_true")
+    main_group.add_argument("--show", help="Show running topology", action="store_true")
     main_group.add_argument(
-        "--create",
-        help="Create topology",
-        action="store_true"
-    )
-    main_group.add_argument(
-        "--destroy",
-        help="Destroy topology",
-        action="store_true"
-    )
-    main_group.add_argument(
-        "--show",
-        help="Show running topology",
-        action="store_true"
-    )
-    main_group.add_argument(
-        "--eif",
-        help="Enable ip forwarding for cEOS devices",
-        action="store_true"
+        "--eif", help="Enable ip forwarding for cEOS devices", action="store_true"
     )
     main_group.add_argument(
         "--lldp",
         help="Enable LLDP forwarding for vrnetlab devices",
-        action="store_true"
+        action="store_true",
     )
-    main_group.add_argument(
-        "--graph",
-        help="Generate a D3 graph",
-        action="store_true"
-    )
+    main_group.add_argument("--graph", help="Generate a D3 graph", action="store_true")
 
-    parser.add_argument(
-        "topology",
-        help='Topology file',
-        type=str
-    )
+    parser.add_argument("topology", help="Topology file", type=str)
     args = parser.parse_args()
     return args
+
 
 def parse_yaml(t_yml):
     """
@@ -107,8 +83,8 @@ def parse_yaml(t_yml):
     """
     devices = dict()
     links = list()
-    for idx, link_dsc in enumerate(t_yml['links']):
-        link_endpoints = link_dsc.get('endpoints', None)
+    for idx, link_dsc in enumerate(t_yml["links"]):
+        link_endpoints = link_dsc.get("endpoints", None)
         # Example: link_endpoints = ["Device-A:Interface-2", "host-B:Interface-3:12.12.12.1/24"]
         if not link_endpoints:
             LOG.error("Missing endpoints definition")
@@ -119,6 +95,7 @@ def parse_yaml(t_yml):
         parse_endpoints(devices, link_endpoints, link, idx)
     return devices, links
 
+
 def parse_endpoints(devices, endpoints, link, idx):
     """
     Parses a single endpoints list in the format:
@@ -127,38 +104,42 @@ def parse_endpoints(devices, endpoints, link, idx):
     """
     for endpoint in endpoints:
         # Example: ep == "host-3:Eth2:192.168.10.30/24"
-        ep = endpoint.split(':')
+        ep = endpoint.split(":")
         # Example: ep == ["host-3", "Eth2", "192.168.10.30/24"]
         if not ep:
-            LOG.error('Link contains empty definition')
+            LOG.error("Link contains empty definition")
         device_name = ep.pop(0)
         # stripping domain name from device
-        device_name = device_name.split('.')[0]
+        device_name = device_name.split(".")[0]
         if len(ep) > 1:
             ip = ep.pop()
         else:
-            ip = ''
+            ip = ""
         # Example: device_name == "host-3"
         # We only support Host and CEOS device types
-        if 'host' in device_name.lower():
+        if "host" in device_name.lower():
             # Example: ep == ["Eth2","192.168.10.30/24"]
             device = devices.get(device_name, Host(device_name))
-        elif 'qrtr' in device_name.lower():      
-            device = devices.get(device_name, Quagga(device_name))  
-        elif 'xrv' in device_name.lower():      
-            device = devices.get(device_name, XRV(device_name))  
-        elif 'vmx' in device_name.lower():
+        elif "qrtr" in device_name.lower():
+            device = devices.get(device_name, Quagga(device_name))
+        elif "xrv" in device_name.lower():
+            device = devices.get(device_name, XRV(device_name))
+        elif "vmx" in device_name.lower():
             device = devices.get(device_name, VMX(device_name))
-        elif 'csr' in device_name.lower():
+        elif "csr" in device_name.lower():
             device = devices.get(device_name, CSR(device_name))
         elif any(image in device_name.lower() for image in CUSTOM_IMAGE.keys()):
-            image_name = [CUSTOM_IMAGE[image] for image in CUSTOM_IMAGE.keys() if image in device_name.lower()][0]
+            image_name = [
+                CUSTOM_IMAGE[image]
+                for image in CUSTOM_IMAGE.keys()
+                if image in device_name.lower()
+            ][0]
             device = devices.get(device_name, Generic(device_name, image=image_name))
         else:
             # This creates the default CEOS device type
             device = devices.get(device_name, CEOS(device_name))
             # We don't want to configure IPs here
-            ip = ''
+            ip = ""
         # Adding IP if defined
         if ip:
             device.add_ip(ip, ep[0])
@@ -166,55 +147,71 @@ def parse_endpoints(devices, endpoints, link, idx):
         int_name = int_name.replace("Ethernet", "eth")
         # Remember device connections
         device.connect(int_name, link)
-        devices[device_name] = device 
-    return 
+        devices[device_name] = device
+    return
 
-def compare_links(received,stored):
+
+def compare_links(received, stored):
     # Sorting internal dicts
     received = set([json.dumps(el, sort_keys=True) for el in received])
     stored = set([json.dumps(el, sort_keys=True) for el in stored])
     delta = received.difference(stored)
-    LOG.debug(f'Delta between received and stored: {delta}')
+    LOG.debug(f"Delta between received and stored: {delta}")
     # Returning True if delta is not set([])
     return not bool(delta)
+
 
 def write_file(filename, text):
     cwd = os.path.dirname(os.path.realpath(__file__))
     filepath = os.path.join(cwd, filename)
-    with open(filepath, 'w') as f:
+    with open(filepath, "w") as f:
         f.write(text)
+
 
 def create_d3_graph(devices, links):
     g = nx.Graph()
-    devices_running = [device.get() for _,device in devices.items() if len(device.get()) > 0]
-    devices_sorted  = sorted([device.lower() for device,_ in devices.items()])
+    devices_running = [
+        device.get() for _, device in devices.items() if len(device.get()) > 0
+    ]
+    devices_sorted = sorted([device.lower() for device, _ in devices.items()])
     g.add_nodes_from([(devices_sorted.index(d), dict(name=d)) for d in devices_sorted])
-    [ g.add_edge(devices_sorted.index(link.endpoints[0][0]),
-                 devices_sorted.index(link.endpoints[1][0]), 
-                 value=1) 
-                 for link in links if len(link.endpoints) == 2 ]
-    device_nodes = {d[0].metadata.name: d[0].spec.node_name for d in devices_running if d}
+    [
+        g.add_edge(
+            devices_sorted.index(link.endpoints[0][0]),
+            devices_sorted.index(link.endpoints[1][0]),
+            value=1,
+        )
+        for link in links
+        if len(link.endpoints) == 2
+    ]
+    device_nodes = {
+        d[0].metadata.name: d[0].spec.node_name for d in devices_running if d
+    }
     # faking device nodes
-    #device_nodes = {'host-1': 'node1', 'host-2': 'node1', 'host-3': 'node3'}
+    # device_nodes = {'host-1': 'node1', 'host-2': 'node1', 'host-3': 'node3'}
     unique_nodes = sorted(list(set(device_nodes.values())))
-    groups = {devices_sorted.index(device): unique_nodes.index(node) for device, node in device_nodes.items()}
-    nx.set_node_attributes(g,  groups, "group")
-    #print(json_graph.node_link_data(g))
+    groups = {
+        devices_sorted.index(device): unique_nodes.index(node)
+        for device, node in device_nodes.items()
+    }
+    nx.set_node_attributes(g, groups, "group")
+    # print(json_graph.node_link_data(g))
     cwd = os.getcwd()
     filepath = os.path.join(cwd, "web/graph.json")
-    with open(filepath, 'w') as f:
+    with open(filepath, "w") as f:
         f.write(json.dumps(json_graph.node_link_data(g), indent=2))
 
-def delayed_start(devices, step = 15, base = 45):
+
+def delayed_start(devices, step=15, base=45):
     # Naive implementation
     # Base increments will be applied to every $step devics
     num_nodes = 4
-    #total_devices = len(devices)
-    #max_wait = total_devices * 5
-    #import random
+    # total_devices = len(devices)
+    # max_wait = total_devices * 5
+    # import random
     for idx, (_, device) in enumerate(devices.items()):
         delay = (idx // step) * base * num_nodes
-        #delay = random.randint(0, max_wait)
+        # delay = random.randint(0, max_wait)
         device.set_sleep(delay)
 
 
@@ -225,17 +222,17 @@ class Device(object):
         self.topo = PREFIX
         self.orig = name
         self.name = name.lower()
-        self.type = ''
+        self.type = ""
         self.interfaces = dict()
         self.ips = dict()
         self.command = list()
         self.args = list()
-        self.image = ''
+        self.image = ""
         self.environment = []
         self.sleep = 0
         self.full_links = list()
         self.entry_cmd = f"kubectl exec -it {self.name} sh"
-        self.outside = 'Unset'
+        self.outside = "Unset"
         self.config_present = True
         self.constraints = None
         self.namespace = DEFAULT_NAMESPACE
@@ -246,10 +243,11 @@ class Device(object):
         self.startup_file = "config"
         self.idx = Device.globalIndex
         Device.globalIndex += 1
-    
+
     def get(self):
-        return K8S.list_namespaced_pod(namespace=self.namespace, 
-                                       field_selector=f"metadata.name={self.name}").items
+        return K8S.list_namespaced_pod(
+            namespace=self.namespace, field_selector=f"metadata.name={self.name}"
+        ).items
 
     def configure(self, text=""):
         startup = os.path.join(CONF_DIR, self.orig)
@@ -269,10 +267,11 @@ class Device(object):
         cmap = client.V1ConfigMap()
         cmap.metadata = client.V1ObjectMeta(name=f"{self.name}-config")
         try:
-            K8S.delete_namespaced_config_map(name=f"{self.name}-config", 
-                                             namespace=self.namespace, body=cmap)
+            K8S.delete_namespaced_config_map(
+                name=f"{self.name}-config", namespace=self.namespace, body=cmap
+            )
         except:
-            LOG.info(f'Failed to delete ConfigMap')
+            LOG.info(f"Failed to delete ConfigMap")
 
     # Overrides default entry_cmd for specific classes (vrnetlab)
     def update_entry(self):
@@ -290,32 +289,44 @@ class Device(object):
         spec.selector = {"app": self.name}
         spec.type = "NodePort"
         port = client.V1ServicePort(
-            name=f"port-{outside}", 
-            protocol="TCP", 
-            port=inside, 
-            target_port=inside, 
-            node_port=outside
-            )
+            name=f"port-{outside}",
+            protocol="TCP",
+            port=inside,
+            target_port=inside,
+            node_port=outside,
+        )
         spec.ports = [port]
         service.spec = spec
         K8S.create_namespaced_service(namespace=self.namespace, body=service)
 
     def delete_service(self):
         try:
-            delete_options = client.V1DeleteOptions(api_version='v1',grace_period_seconds=0)
-            K8S.delete_namespaced_service(name=f"service-{self.name}", namespace=self.namespace, 
-                                          body=delete_options)
+            delete_options = client.V1DeleteOptions(
+                api_version="v1", grace_period_seconds=0
+            )
+            K8S.delete_namespaced_service(
+                name=f"service-{self.name}",
+                namespace=self.namespace,
+                body=delete_options,
+            )
         except:
-            LOG.debug(f'Failed to delete Service')
+            LOG.debug(f"Failed to delete Service")
 
     def _exec_command(self, command):
-        return stream(K8S.connect_get_namespaced_pod_exec, self.name, 
-                      self.namespace, command=command, stderr=True, 
-                      stdin=True, stdout=True, tty=False)
+        return stream(
+            K8S.connect_get_namespaced_pod_exec,
+            self.name,
+            self.namespace,
+            command=command,
+            stderr=True,
+            stdin=True,
+            stdout=True,
+            tty=False,
+        )
 
     def set_sleep(self, num):
         self.sleep = num
-    
+
     def get_status(self):
         return K8S.read_namespaced_pod_status(self.name, self.namespace).status.phase
 
@@ -326,10 +337,14 @@ class Device(object):
 
     def enable_lldp_forwarding(self):
         LOG.debug(f"Enabling LLDP forwarding for {self.name}")
-        remount_sys = ["bin/sh", "-c", "mount -o ro,remount /sys; mount -o rw,remount /sys"]
+        remount_sys = [
+            "bin/sh",
+            "-c",
+            "mount -o ro,remount /sys; mount -o rw,remount /sys",
+        ]
         self._exec_command(remount_sys)
         result = self._exec_command(["bin/sh", "-c", "ls /sys/class/net/ | grep br-"])
-        bridges = [x for x in result.split('\n') if x]
+        bridges = [x for x in result.split("\n") if x]
         for bridge in bridges:
             lldp_enable = f"echo 16384 > /sys/class/net/{bridge}/bridge/group_fwd_mask"
             self._exec_command(["bin/sh", "-c", lldp_enable])
@@ -338,17 +353,17 @@ class Device(object):
     def expand_links(self):
         for interface, link in self.interfaces.items():
             full_link = dict()
-            full_link['uid']        = link.vni
-            full_link['local_intf'] = interface.replace('/','_')
-            full_link['local_ip']   = self.ips.get(interface, "")
+            full_link["uid"] = link.vni
+            full_link["local_intf"] = interface.replace("/", "_")
+            full_link["local_ip"] = self.ips.get(interface, "")
 
             my_endpoint = (self.name, interface, self.ips.get(interface, ""), _)
             peer_endpoints = [x for x in link.endpoints if x != my_endpoint]
             peer_name, peer_intf, peer_ip, _ = peer_endpoints.pop(0)
 
-            full_link['peer_intf'] = peer_intf.replace('/','_')
-            full_link['peer_pod'] = peer_name
-            full_link['peer_ip']   = peer_ip
+            full_link["peer_intf"] = peer_intf.replace("/", "_")
+            full_link["peer_pod"] = peer_name
+            full_link["peer_ip"] = peer_ip
             self.full_links.append(full_link)
         return
 
@@ -358,46 +373,39 @@ class Device(object):
             self.expand_links()
 
         body = {
-            "apiVersion": '/'.join([GVR['group'], GVR['version']]),
+            "apiVersion": "/".join([GVR["group"], GVR["version"]]),
             "kind": "Topology",
-            "metadata": {
-                "name": self.name,
-                "labels": {
-                    "topo": self.topo
-                }
-            },
-            "spec": {
-                "links": self.full_links
-            }
+            "metadata": {"name": self.name, "labels": {"topo": self.topo}},
+            "spec": {"links": self.full_links},
         }
 
         response = CRD.create_namespaced_custom_object(
-            group=GVR['group'],
-            version=GVR['version'],
+            group=GVR["group"],
+            version=GVR["version"],
             namespace=self.namespace,
-            plural=GVR['plural'],
-            body=body
+            plural=GVR["plural"],
+            body=body,
         )
-        LOG.debug(f'Got response: {response}')
+        LOG.debug(f"Got response: {response}")
 
         return True
-    
+
     def delete_from_k8s(self):
         LOG.debug("Deleting topology from K8s")
         response = CRD.delete_namespaced_custom_object(
-            group=GVR['group'],
-            version=GVR['version'],
+            group=GVR["group"],
+            version=GVR["version"],
             name=self.name,
             namespace=self.namespace,
-            plural=GVR['plural'],
-            body=client.V1DeleteOptions()          
+            plural=GVR["plural"],
+            body=client.V1DeleteOptions(),
         )
-        
+
         LOG.debug(f"Got response: {response}")
         return True
 
     def connect(self, interface, link):
-        LOG.debug(f'Creating a pointer to link {link.name} for {interface}@{self.name}')
+        LOG.debug(f"Creating a pointer to link {link.name} for {interface}@{self.name}")
         self.interfaces[interface] = link
         # register ourselves as one of link's endpoints
         link.add_endpoint(self.name, interface, self.ips.get(interface, ""))
@@ -418,30 +426,34 @@ class Device(object):
 
     def _build_nsurls(self):
         LOG.debug("Building NSM URLs")
-        return [self._build_nsurl(intf, link) for intf, link in self.interfaces.items() if link.is_owner(self.name, intf)]
+        return [
+            self._build_nsurl(intf, link)
+            for intf, link in self.interfaces.items()
+            if link.is_owner(self.name, intf)
+        ]
 
     def create_nsm(self):
         self.configure()
         if not self.get():
             # virtual network device container
-            container                   = client.V1Container(name="router")
-            container.image             = self.image
-            container.command           = self.command
-            container.args              = self.args
-            container.env               = self.environment
+            container = client.V1Container(name="router")
+            container.image = self.image
+            container.command = self.command
+            container.args = self.args
+            container.env = self.environment
             container.image_pull_policy = "IfNotPresent"
 
             cap_net_admin = client.V1Capabilities(add=["NET_ADMIN"])
-            sec_context                = client.V1SecurityContext(capabilities=cap_net_admin)
+            sec_context = client.V1SecurityContext(capabilities=cap_net_admin)
             container.security_context = sec_context
 
             # nsc-sidecar container
             nsc_container = client.V1Container(name="nsc-sidecar")
-            nsc_container.image = "networkservicemesh/topology-sidecar-nsc:latest"
+            nsc_container.image = "networkservicemesh/topology-sidecar-nsc:master"
             nsc_container.image_pull_policy = "IfNotPresent"
 
-            env_nsm_io = client.V1EnvVar(name="NS_NETWORKSERVICEMESH_IO",
-            value=",".join(self._build_nsurls())
+            env_nsm_io = client.V1EnvVar(
+                name="NS_NETWORKSERVICEMESH_IO", value=",".join(self._build_nsurls())
             )
             nsc_container.env = [env_nsm_io]
 
@@ -450,60 +462,66 @@ class Device(object):
             resource_requirements = client.V1ResourceRequirements(limits=nsm_limits)
             nsc_container.resources = resource_requirements
 
-            # nse-sidecar container            
+            # nse-sidecar container
             nse_container = client.V1Container(name="nse-sidecar")
-            nse_container.image = "networkservicemesh/topology-sidecar-nse:latest"
+            nse_container.image = "networkservicemesh/topology-sidecar-nse:master"
             nse_container.image_pull_policy = "IfNotPresent"
             nse_container.resources = resource_requirements
 
-            env_nse_name = client.V1EnvVar(name="ADVERTISE_NSE_NAME", value=self.topo)
-            env_nse_label = client.V1EnvVar(name="ADVERTISE_NSE_LABELS", value=f"device={self.name}")
-            env_ip_addr = client.V1EnvVar(name="IP_ADDRESS", value=f"10.60.{self.idx}.0/24")
+            env_nse_name = client.V1EnvVar(name="ENDPOINT_NETWORK_SERVICE", value=self.topo)
+            env_nse_label = client.V1EnvVar(
+                name="ENDPOINT_LABELS", value=f"device={self.name}"
+            )
+            env_ip_addr = client.V1EnvVar(
+                name="IP_ADDRESS", value=f"10.60.{self.idx}.0/24"
+            )
             nse_container.env = [env_nse_name, env_nse_label, env_ip_addr]
 
             # Volume mounts for primary (device) container
-            volume_mount = client.V1VolumeMount(name="startup-config-volume", 
-                                                mount_path=os.path.join(self.conf_path, self.startup_file),
-                                                sub_path=self.startup_file)
+            volume_mount = client.V1VolumeMount(
+                name="startup-config-volume",
+                mount_path=os.path.join(self.conf_path, self.startup_file),
+                sub_path=self.startup_file,
+            )
             if self.config_present:
                 container.volume_mounts = [volume_mount]
 
-            cmap   = client.V1ConfigMapVolumeSource(name=f"{self.name}-config")
+            cmap = client.V1ConfigMapVolumeSource(name=f"{self.name}-config")
             volume = client.V1Volume(name="startup-config-volume", config_map=cmap)
-            
+
             # Main pod specification
             containers = [container, nse_container, nsc_container]
             # Drop NSC if not a client for any link
             if not self._build_nsurls():
                 containers.pop(2)
-                
-            spec=client.V1PodSpec(containers=containers)
+
+            spec = client.V1PodSpec(containers=containers)
 
             if self.config_present:
-                spec.volumes=[volume]
+                spec.volumes = [volume]
             spec.termination_grace_period_seconds = 0
-            pod=client.V1Pod()
-            pod.metadata=client.V1ObjectMeta(name=self.name, 
-                                             labels={ "app" : self.name, "topo": self.topo })
+            pod = client.V1Pod()
+            pod.metadata = client.V1ObjectMeta(
+                name=self.name, labels={"app": self.name, "topo": self.topo}
+            )
             pod.spec = spec
-            return K8S.create_namespaced_pod(namespace=self.namespace, 
-                                             body=pod)
+            return K8S.create_namespaced_pod(namespace=self.namespace, body=pod)
         return False
 
     def create_default(self):
         self.configure()
         if not self.get():
-            container                   = client.V1Container(name=self.name)
-            container.image             = self.image
-            container.command           = self.command
-            container.args              = self.args
-            container.env               = self.environment
+            container = client.V1Container(name=self.name)
+            container.image = self.image
+            container.command = self.command
+            container.args = self.args
+            container.env = self.environment
             container.image_pull_policy = "IfNotPresent"
 
-            init_container                   = client.V1Container(name=f"init-{self.name}")
-            init_container.image             = "networkop/init-wait:latest"
+            init_container = client.V1Container(name=f"init-{self.name}")
+            init_container.image = "networkop/init-wait:latest"
             init_container.image_pull_policy = "IfNotPresent"
-            init_container.args              = [f"{len(self.interfaces)+1}", f"{self.sleep}"]
+            init_container.args = [f"{len(self.interfaces)+1}", f"{self.sleep}"]
 
             # Setting resource requests
             if self.constraints:
@@ -514,59 +532,74 @@ class Device(object):
                 if cpu_requests:
                     requests["cpu"] = cpu_requests
                     # Allowing maximum of double the requests CPU time (dunno why, just to try)
-                    limits["cpu"] = str( 2 * float( cpu_requests )) 
+                    limits["cpu"] = str(2 * float(cpu_requests))
                 if memory_requests:
                     requests["memory"] = memory_requests
-                resource_requirements = client.V1ResourceRequirements(limits=limits, requests=requests)
+                resource_requirements = client.V1ResourceRequirements(
+                    limits=limits, requests=requests
+                )
                 container.resources = resource_requirements
 
             # Setting pod anti-affinity (to spread them across nodes more evenly)
-            label_selector_requirement = client.V1LabelSelectorRequirement(key='topo', operator='In', values = [self.topo])
-            label_selector  = client.V1LabelSelector()
+            label_selector_requirement = client.V1LabelSelectorRequirement(
+                key="topo", operator="In", values=[self.topo]
+            )
+            label_selector = client.V1LabelSelector()
             label_selector.match_expressions = [label_selector_requirement]
-            pod_affinity_term = client.V1PodAffinityTerm(label_selector=label_selector, topology_key='kubernetes.io/hostname')
-            pod_affinity_term_weighted = client.V1WeightedPodAffinityTerm(pod_affinity_term=pod_affinity_term, weight=100)
-            pod_anti_affinity = client.V1PodAntiAffinity(preferred_during_scheduling_ignored_during_execution=[pod_affinity_term_weighted])
+            pod_affinity_term = client.V1PodAffinityTerm(
+                label_selector=label_selector, topology_key="kubernetes.io/hostname"
+            )
+            pod_affinity_term_weighted = client.V1WeightedPodAffinityTerm(
+                pod_affinity_term=pod_affinity_term, weight=100
+            )
+            pod_anti_affinity = client.V1PodAntiAffinity(
+                preferred_during_scheduling_ignored_during_execution=[
+                    pod_affinity_term_weighted
+                ]
+            )
             affinity = client.V1Affinity(pod_anti_affinity=pod_anti_affinity)
-            
 
-            sec_context                = client.V1SecurityContext(privileged=True)
+            sec_context = client.V1SecurityContext(privileged=True)
             container.security_context = sec_context
 
-            volume_mount = client.V1VolumeMount(name="startup-config-volume", 
-                                                mount_path=os.path.join(self.conf_path, self.startup_file),
-                                                sub_path=self.startup_file)
+            volume_mount = client.V1VolumeMount(
+                name="startup-config-volume",
+                mount_path=os.path.join(self.conf_path, self.startup_file),
+                sub_path=self.startup_file,
+            )
             if self.config_present:
                 container.volume_mounts = [volume_mount]
 
-            cmap   = client.V1ConfigMapVolumeSource(name=f"{self.name}-config")
+            cmap = client.V1ConfigMapVolumeSource(name=f"{self.name}-config")
             volume = client.V1Volume(name="startup-config-volume", config_map=cmap)
-            
-            spec=client.V1PodSpec(containers=[container], affinity=affinity)
+
+            spec = client.V1PodSpec(containers=[container], affinity=affinity)
             if self.config_present:
-                spec.volumes=[volume]
+                spec.volumes = [volume]
             spec.termination_grace_period_seconds = 0
             spec.init_containers = [init_container]
-            pod=client.V1Pod()
-            pod.metadata=client.V1ObjectMeta(name=self.name, 
-                                             labels={ "app" : self.name, "topo": self.topo })
+            pod = client.V1Pod()
+            pod.metadata = client.V1ObjectMeta(
+                name=self.name, labels={"app": self.name, "topo": self.topo}
+            )
             pod.spec = spec
-            return K8S.create_namespaced_pod(namespace=self.namespace, 
-                                             body=pod)
+            return K8S.create_namespaced_pod(namespace=self.namespace, body=pod)
         return False
-    
+
     def destroy(self):
         self.unconfigure()
         self.delete_service()
         if self.get():
-            return K8S.delete_namespaced_pod(name=self.name, 
-                                             namespace=self.namespace, 
-                                             body=client.V1DeleteOptions(),
-                                             grace_period_seconds=0)
+            return K8S.delete_namespaced_pod(
+                name=self.name,
+                namespace=self.namespace,
+                body=client.V1DeleteOptions(),
+                grace_period_seconds=0,
+            )
         return False
 
     @staticmethod
-    def  _verify_addr(ip):
+    def _verify_addr(ip):
         prefix = netaddr.IPNetwork(ip)
         return prefix.prefixlen < 32
 
@@ -574,12 +607,13 @@ class Device(object):
         if self._verify_addr(ip):
             self.ips[intf] = ip
 
+
 class CEOS(Device):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image =  CEOS_IMAGE
+        self.image = CEOS_IMAGE
         self.command = ["/sbin/init"]
-        self.type = 'ceos'
+        self.type = "ceos"
         # Extracing image tag
         ceos_version = self.image.split("/")[-1].split(":")[-1]
         # This assumes that docker image tag contains the correct EOS version, e.g. ceos:4.20.5
@@ -588,79 +622,83 @@ class CEOS(Device):
         else:
             eos_platform = "ceoslab"
         self.environment = [
-            {"name": "CEOS",                                "value": "1"},
-            {"name": "EOS_PLATFORM",                        "value": eos_platform},
-            {"name": "container",                           "value":"docker"},
-            {"name": "ETBA",                                "value": "1"},
+            {"name": "CEOS", "value": "1"},
+            {"name": "EOS_PLATFORM", "value": eos_platform},
+            {"name": "container", "value": "docker"},
+            {"name": "ETBA", "value": "1"},
             {"name": "SKIP_ZEROTOUCH_BARRIER_IN_SYSDBINIT", "value": "1"},
-            {"name": "INTFTYPE",                            "value": "eth"}
+            {"name": "INTFTYPE", "value": "eth"},
         ]
         self.entry_cmd = f"kubectl exec -it {self.name} Cli"
         self.conf_path = "/mnt/flash"
         self.startup_file = "startup-config"
         self.constraints = {"cpu": "0.5", "memory": "1Gi"}
-                
+
+
 class Host(Device):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image =  'alpine'
-        self.command =  ["/bin/sh", "-c", "sleep 2000000000000"]
+        self.image = "alpine"
+        self.command = ["/bin/sh", "-c", "sleep 2000000000000"]
+
 
 class Quagga(Device):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image =  'networkop/qrtr'
+        self.image = "networkop/qrtr"
         self.conf_path = "/etc/quagga"
         self.startup_file = "zebra.conf"
+
 
 class XRV(Device):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sleep += 10
-        self.image =  XRV_IMAGE
-        self.type = 'xrv'
-        self.args = ['--meshnet', '--trace']
+        self.image = XRV_IMAGE
+        self.type = "xrv"
+        self.args = ["--meshnet", "--trace"]
 
     def update_entry(self):
-        self.entry_cmd = f'ssh -p {self.outside} vrnetlab@localhost'
+        self.entry_cmd = f"ssh -p {self.outside} vrnetlab@localhost"
 
 
-class VMX(Device):                        
-    def __init__(self, *args, **kwargs):                       
-        super().__init__(*args, **kwargs) 
+class VMX(Device):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.sleep += 10
-        self.image =  VMX_IMAGE                                
-        self.type = 'vmx'                                       
-        self.args = ['--meshnet', '--trace']
+        self.image = VMX_IMAGE
+        self.type = "vmx"
+        self.args = ["--meshnet", "--trace"]
         self.constraints = {"cpu": "1", "memory": "5Gi"}
 
     def update_entry(self):
-        self.entry_cmd = f'ssh -p {self.outside} vrnetlab@localhost'
+        self.entry_cmd = f"ssh -p {self.outside} vrnetlab@localhost"
 
-class CSR(Device):                        
-    def __init__(self, *args, **kwargs):                       
-        super().__init__(*args, **kwargs) 
+
+class CSR(Device):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.sleep += 10
-        self.image =  CSR_IMAGE                                
-        self.type = 'csr'                                       
-        self.args = ['--meshnet']
+        self.image = CSR_IMAGE
+        self.type = "csr"
+        self.args = ["--meshnet"]
         self.constraints = {"cpu": "0.5", "memory": "3Gi"}
 
     def update_entry(self):
-        self.entry_cmd = f'ssh -p {self.outside} vrnetlab@localhost'                            
+        self.entry_cmd = f"ssh -p {self.outside} vrnetlab@localhost"
+
 
 class Generic(Device):
     def __init__(self, *args, **kwargs):
-        image = kwargs.pop('image', "alpine")
+        image = kwargs.pop("image", "alpine")
         super().__init__(*args, **kwargs)
         # Overriding defaults
         self.image = image
-        self.type = 'generic'
+        self.type = "generic"
         self.conf_path = "/mnt/flash"
         self.startup_file = "startup-config"
         self.constraints = {"cpu": "1", "memory": "2Gi"}
-        self.entry_cmd = 'kubectl exec -it {} sh'.format(self.name)
-
+        self.entry_cmd = "kubectl exec -it {} sh".format(self.name)
 
 
 class Link(object):
@@ -668,9 +706,9 @@ class Link(object):
         # Type is for future use, currently type is p2p
         self.link_type = link_type
         self.vni = idx
-        self.name = f'net-{idx}'
+        self.name = f"net-{idx}"
         self.endpoints = list()
-        
+
     def add_endpoint(self, name, interface, ip):
         endpoint = (name, interface, ip, len(self.endpoints))
         self.endpoints.append(endpoint)
@@ -683,6 +721,7 @@ class Link(object):
         endpoint = my_endpoints.pop(0)
         return endpoint[3] == 0
 
+
 def upload_nse_to_k8s(links, topology):
     LOG.debug("Uploading NSE to K8s")
     nse_matches = list()
@@ -690,67 +729,64 @@ def upload_nse_to_k8s(links, topology):
         remote_endpoint = [x[0] for x in link.endpoints if x[3] != 0]
         match = dict()
         match["match"] = None
-        match["sourceSelector"] = { "link": link.name }
+        match["sourceSelector"] = {"link": link.name}
         match["route"] = list()
         route = dict()
         route["destination"] = None
-        route["destinationSelector"] = { "device": remote_endpoint[0] }
+        route["destinationSelector"] = {"device": remote_endpoint[0]}
         match["route"].append(route)
         nse_matches.append(match)
-    
+
     body = {
         "apiVersion": f"{NSM['group']}/{NSM['version']}",
         "kind": f"{NSM['kind']}",
-        "metadata": {
-            "name": topology,
-        },
-        "spec": {
-            "payload": "IP",
-            "matches": nse_matches
-        }
+        "metadata": {"name": topology},
+        "spec": {"payload": "IP", "matches": nse_matches},
     }
     response = CRD.create_namespaced_custom_object(
-        group=NSM['group'],
-        version=NSM['version'],
+        group=NSM["group"],
+        version=NSM["version"],
         namespace=DEFAULT_NAMESPACE,
-        plural=NSM['plural'],
-        body=body
+        plural=NSM["plural"],
+        body=body,
     )
-    LOG.debug(f'Got response: {response}')
-    
+    LOG.debug(f"Got response: {response}")
+
     return True
+
 
 def delete_nse_from_k8s(topology):
     LOG.debug("Deleting NSE from K8s")
     response = CRD.delete_namespaced_custom_object(
-        group=NSM['group'],
-        version=NSM['version'],
+        group=NSM["group"],
+        version=NSM["version"],
         name=topology,
         namespace=DEFAULT_NAMESPACE,
-        plural=NSM['plural'],
-        body=client.V1DeleteOptions()          
+        plural=NSM["plural"],
+        body=client.V1DeleteOptions(),
     )
-    
+
     LOG.debug(f"Got response: {response}")
     return True
+
 
 def main():
     # Initializing main variables
     global CEOS_IMAGE, CONF_DIR, PUBLISH_BASE, XRV_IMAGE, VMX_IMAGE, CSR_IMAGE, CUSTOM_IMAGE, PREFIX, ENABLE_NSM
 
     # Assigning arguments
-    args    = parse_args()
-    debug   = args.debug
-    create  = args.create
+    args = parse_args()
+    debug = args.debug
+    create = args.create
     destroy = args.destroy
-    show    = args.show
-    graph   = args.graph
-    eif     = args.eif
-    lldp    = args.lldp
-    t_file  = os.path.join(os.getcwd(), args.topology)
-    t_fn    = os.path.split(args.topology)[-1]
+    show = args.show
+    graph = args.graph
+    eif = args.eif
+    lldp = args.lldp
+    t_file = os.path.join(os.getcwd(), args.topology)
+    t_fn = os.path.split(args.topology)[-1]
     t_file_pwd = os.path.split(t_file)[0]
-    PREFIX  = t_fn.split('.')[0]
+    PREFIX = t_fn.split(".")[0]
 
     # Logging settings
     if debug:
@@ -761,39 +797,39 @@ def main():
     logging.basicConfig(level=log_level)
 
     # Loading topology YAML file
-    with open(t_file, 'r') as stream:
+    with open(t_file, "r") as stream:
         t_yml = yaml.safe_load(stream)
-    LOG.debug("Loaded topology from YAML file {}\n {}"
-                 .format(t_file, yaml.safe_dump(t_yml)))
-    if 'links' not in t_yml:
-        LOG.info('"links" dictionary is not found in {}'
-                    .format(t_file))
+    LOG.debug(
+        "Loaded topology from YAML file {}\n {}".format(t_file, yaml.safe_dump(t_yml))
+    )
+    if "links" not in t_yml:
+        LOG.info('"links" dictionary is not found in {}'.format(t_file))
         return 1
 
     # Overriding defaults
-    ENABLE_NSM = t_yml.get('nsm', os.getenv('ENABLE_NSM', ENABLE_NSM))
-    CEOS_IMAGE = t_yml.get('ceos_image', os.getenv('CEOS_IMAGE', CEOS_IMAGE))
-    VMX_IMAGE  = t_yml.get('VMX_IMAGE',os.getenv('VMX_IMAGE', VMX_IMAGE))
-    XRV_IMAGE  = t_yml.get('XRV_IMAGE',os.getenv('XRV_IMAGE', XRV_IMAGE))
-    CSR_IMAGE  = t_yml.get('CSR_IMAGE',os.getenv('CSR_IMAGE', CSR_IMAGE))
-    CONF_DIR   = t_yml.get('conf_dir', os.getenv('CONF_DIR', t_file_pwd))
-    CUSTOM_IMAGE = t_yml.get('custom_image',os.getenv('custom_image', CUSTOM_IMAGE))
-    PUBLISH_BASE = t_yml.get('publish_base', os.getenv('PUBLISH_BASE', PUBLISH_BASE))
-    PREFIX = t_yml.get('prefix',os.getenv('PREFIX', PREFIX))
-    delay = t_yml.get('delay', os.getenv('delay', False))
+    ENABLE_NSM = t_yml.get("nsm", os.getenv("ENABLE_NSM", ENABLE_NSM))
+    CEOS_IMAGE = t_yml.get("ceos_image", os.getenv("CEOS_IMAGE", CEOS_IMAGE))
+    VMX_IMAGE = t_yml.get("VMX_IMAGE", os.getenv("VMX_IMAGE", VMX_IMAGE))
+    XRV_IMAGE = t_yml.get("XRV_IMAGE", os.getenv("XRV_IMAGE", XRV_IMAGE))
+    CSR_IMAGE = t_yml.get("CSR_IMAGE", os.getenv("CSR_IMAGE", CSR_IMAGE))
+    CONF_DIR = t_yml.get("conf_dir", os.getenv("CONF_DIR", t_file_pwd))
+    CUSTOM_IMAGE = t_yml.get("custom_image", os.getenv("custom_image", CUSTOM_IMAGE))
+    PUBLISH_BASE = t_yml.get("publish_base", os.getenv("PUBLISH_BASE", PUBLISH_BASE))
+    PREFIX = t_yml.get("prefix", os.getenv("PREFIX", PREFIX))
+    delay = t_yml.get("delay", os.getenv("delay", False))
 
     # Normalising CONF_DIR according to CWD of the topology file
     CONF_DIR = os.path.join(t_file_pwd, CONF_DIR)
 
     devices, links = parse_yaml(t_yml)
-    
+
     if delay:
         delayed_start(devices)
 
     if create:
         LOG.debug("Creating topology CRDs...")
         if not ENABLE_NSM:
-            uploaded = [bool(device.upload_to_k8s()) for _,device in devices.items()]
+            uploaded = [bool(device.upload_to_k8s()) for _, device in devices.items()]
         else:
             uploaded = [upload_nse_to_k8s(links, PREFIX)]
         if not all(uploaded):
@@ -801,24 +837,31 @@ def main():
         else:
             LOG.info("All topology data has been uploaded")
 
-        created = [bool(device.create()) for _,device  in devices.items()]
+        created = [bool(device.create()) for _, device in devices.items()]
         if not all(created):
             LOG.info("Not all pods have been created")
         else:
             LOG.info("All pods have been created successfully")
 
-        
         # Publishing external ports
-        device_names = [k for k in devices.keys() if devices[k].type in ['ceos', 'xrv', 'vmx', 'csr']]
+        device_names = [
+            k
+            for k in devices.keys()
+            if devices[k].type in ["ceos", "xrv", "vmx", "csr"]
+        ]
         # Publishing ports. If type is INT assuming default behaviour which is
         # Single mapping of inside 443 to outside PUBLISH_BASE+index
         if PUBLISH_BASE and (type(PUBLISH_BASE) == int):
             base = int(PUBLISH_BASE)
-            if 30001 <= base <= 32767: # Hardcoding default nodeport range 30000-32767 (offset by 1 to not clash with k8s-topo port)
-                for idx,name in enumerate(sorted(device_names)):
+            if (
+                30001 <= base <= 32767
+            ):  # Hardcoding default nodeport range 30000-32767 (offset by 1 to not clash with k8s-topo port)
+                for idx, name in enumerate(sorted(device_names)):
                     # Default is to publish port TCP/443
-                    devices[name].create_service(443,base+idx+443)
-                LOG.info(f"All pods have their TCP/443 port published starting from {base}")
+                    devices[name].create_service(443, base + idx + 443)
+                LOG.info(
+                    f"All pods have their TCP/443 port published starting from {base}"
+                )
         # The second case is when PUBLISH_BASE is a dict, in which case
         # Each element is a mapping: INTERNAL:EXTERNAL, where
         # INTERNAL is an INTEGER, e.g. 22 and
@@ -826,63 +869,99 @@ def main():
         # Example: publish_base: {22:30001,443:30200}
         # Note that we're not checking there's no clash between different nodeport ranges
         elif type(PUBLISH_BASE) == dict:
-            for inside,outside in PUBLISH_BASE.items():
-                LOG.debug("Publish internal port {} -> {} (type {})".format(inside, outside, type(outside)))
+            for inside, outside in PUBLISH_BASE.items():
+                LOG.debug(
+                    "Publish internal port {} -> {} (type {})".format(
+                        inside, outside, type(outside)
+                    )
+                )
                 # Sort all device names alphabetically
-                for idx,name in enumerate(sorted(device_names)):
+                for idx, name in enumerate(sorted(device_names)):
                     # Check that we've got the right types
                     if type(inside) == int and type(outside) == int:
                         nodeport = outside + idx
-                    devices[name].create_service(inside,nodeport)
-        
+                    devices[name].create_service(inside, nodeport)
 
-        LOG.info(''.join([f"\n alias {name}='{device.entry_cmd}'" for (name, device) in devices.items()]))
-           
+        LOG.info(
+            "".join(
+                [
+                    f"\n alias {name}='{device.entry_cmd}'"
+                    for (name, device) in devices.items()
+                ]
+            )
+        )
+
     elif destroy:
-        destroyed = [bool(device.destroy()) for _,device  in devices.items()]
+        destroyed = [bool(device.destroy()) for _, device in devices.items()]
         if not all(destroyed):
             LOG.info("Not all pods have been destroyed")
         else:
-            LOG.info('All pods have been destroyed successfully')
+            LOG.info("All pods have been destroyed successfully")
 
-        LOG.info(''.join([f"\n unalias {name}" for name in devices.keys()]))
+        LOG.info("".join([f"\n unalias {name}" for name in devices.keys()]))
 
         if not ENABLE_NSM:
-            cleanup =  [bool(device.delete_from_k8s()) for _,device in devices.items()]
+            cleanup = [bool(device.delete_from_k8s()) for _, device in devices.items()]
         else:
-            cleanup =  [delete_nse_from_k8s(PREFIX)]
+            cleanup = [delete_nse_from_k8s(PREFIX)]
         if not all(cleanup):
             LOG.info("Not all topology data has been cleaned up")
         else:
-            LOG.info('All topology data has been cleaned up')  
+            LOG.info("All topology data has been cleaned up")
 
     elif show:
-        running = [device.get() for _,device in devices.items() if len(device.get()) > 0]
-        #print(running)
-        print('\n'.join([f'{d[0].metadata.name}@{d[0].spec.node_name}' for d in running if d]))
+        running = [
+            device.get() for _, device in devices.items() if len(device.get()) > 0
+        ]
+        # print(running)
+        print(
+            "\n".join(
+                [f"{d[0].metadata.name}@{d[0].spec.node_name}" for d in running if d]
+            )
+        )
 
     # Enabling IP forwarding inside cEOS
     elif eif:
         for _ in range(WAIT_FOR_RUNNING):
-            running = [device.get_status() == 'Running' for _, device in devices.items() if device.type == 'ceos']
-            if not(all(running)):
+            running = [
+                device.get_status() == "Running"
+                for _, device in devices.items()
+                if device.type == "ceos"
+            ]
+            if not (all(running)):
                 time.sleep(1)
             else:
-                LOG.info("All pods are running, trying to enable ip forwarding for cEOS pods")
-                expected = 'net.ipv4.ip_forward = 1\n'
-                enabled = [device.enable_ip_forwarding() == expected for  _,device in devices.items() if device.type == 'ceos']
+                LOG.info(
+                    "All pods are running, trying to enable ip forwarding for cEOS pods"
+                )
+                expected = "net.ipv4.ip_forward = 1\n"
+                enabled = [
+                    device.enable_ip_forwarding() == expected
+                    for _, device in devices.items()
+                    if device.type == "ceos"
+                ]
                 if all(enabled):
                     LOG.info("All cEOS pods have IP forwarding enabled")
                     break
     # Enabling LLDP forwarding inside vrnetlab devices
     elif lldp:
         for _ in range(WAIT_FOR_RUNNING):
-            running = [device.get_status() == 'Running' for _, device in devices.items() if device.type in ['xrv', 'vmx', 'csr']]
-            if not(all(running)):
+            running = [
+                device.get_status() == "Running"
+                for _, device in devices.items()
+                if device.type in ["xrv", "vmx", "csr"]
+            ]
+            if not (all(running)):
                 time.sleep(1)
             else:
-                LOG.info("All pods are running, trying to enable LLDP forwarding for vrnetlab pods")
-                enabled = [device.enable_lldp_forwarding() for  _,device in devices.items() if device.type in ['xrv', 'vmx', 'csr']]
+                LOG.info(
+                    "All pods are running, trying to enable LLDP forwarding for vrnetlab pods"
+                )
+                enabled = [
+                    device.enable_lldp_forwarding()
+                    for _, device in devices.items()
+                    if device.type in ["xrv", "vmx", "csr"]
+                ]
                 if all(enabled):
                     LOG.info("All vrnetlab pods have LLDP forwarding enabled")
                     break
@@ -890,11 +969,12 @@ def main():
         create_d3_graph(devices, links)
         LOG.info("D3 graph created")
         import socket
+
         my_ip = socket.gethostbyname(socket.gethostname())
         LOG.info(f"URL: http://{my_ip}:30000")
-    
+
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
