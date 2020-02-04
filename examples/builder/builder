@@ -85,14 +85,15 @@ class Device(object):
         interfaces = []
         for my_intf,link in self.peers.items():
             interfaces.append(f"interface {my_intf}")
-            interfaces.append(f"   ip address {link['my_ip']}/{link['link_prefix'].prefixlen}")
-            interfaces.append("   mtu 1300")
-            interfaces.append("   no switchport")
+            if not self.prefix == 'qrtr': # For quagga we don't need IP addresses
+                interfaces.append(f"   ip address {link['my_ip']}/{link['link_prefix'].prefixlen}")
+                interfaces.append("   mtu 1300")
+                interfaces.append("   no switchport")
+            else:
+                interfaces.append("   ip ospf network point-to-point")
             interfaces.append("   exit")
             interfaces.append("!")
         interfaces = [i for i in interfaces if i]
-        if self.prefix == 'qrtr': # For quagga we don't need any interface config
-            interfaces = []
         return '\n'.join(hostname + ospf + loopback + interfaces)
  
 
