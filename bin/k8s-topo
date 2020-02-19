@@ -357,7 +357,7 @@ class Device(object):
             full_link["local_intf"] = interface.replace("/", "_")
             full_link["local_ip"] = self.ips.get(interface, "")
 
-            my_endpoint = (self.name, interface, self.ips.get(interface, ""), link["idx"])
+            my_endpoint = (self.name, interface, self.ips.get(interface, ""), link.idx)
             peer_endpoints = [x for x in link.endpoints if x != my_endpoint]
             peer_name, peer_intf, peer_ip, _ = peer_endpoints.pop(0)
 
@@ -408,7 +408,7 @@ class Device(object):
         LOG.debug(f"Creating a pointer to link {link.name} for {interface}@{self.name}")
         self.interfaces[interface] = link
         # register ourselves as one of link's endpoints
-        link["idx"] = link.add_endpoint(self.name, interface, self.ips.get(interface, ""))
+        link.add_endpoint(self.name, interface, self.ips.get(interface, ""))
         return
 
     def create(self):
@@ -647,7 +647,7 @@ class Quagga(Device):
         super().__init__(*args, **kwargs)
         self.image = "networkop/qrtr"
         self.conf_path = "/etc/quagga"
-        self.startup_file = "zebra.conf"
+        self.startup_file = "Quagga.conf"
 
 
 class XRV(Device):
@@ -708,11 +708,13 @@ class Link(object):
         self.vni = idx
         self.name = f"net-{idx}"
         self.endpoints = list()
+        self.idx = None
 
     def add_endpoint(self, name, interface, ip):
-        endpoint = (name, interface, ip, len(self.endpoints))
+        self.idx = len(self.endpoints)
+        endpoint = (name, interface, ip, self.idx)
         self.endpoints.append(endpoint)
-        return len(self.endpoints)
+        
 
     def my_peers(self, my_name, my_intf):
         return [x for x in self.endpoints if not (x[0] == my_name and x[1] == my_intf)]

@@ -68,7 +68,11 @@ class Device(object):
         hostname = ["!", f"hostname {self.name}", "!"]                  
         if self.prefix == 'qrtr': # This case is for quagga/zebra config
             loopback = 'lo'
-            ospf = []
+            ospf = ["!", 
+            "router ospf", 
+            "network 0.0.0.0/0 area 0.0.0.0", 
+            "passive-interface eth0",
+            "!"]
         else: # This case is for cEOS
             loopback = 'Loopback0'
             ospf = ["ip routing", "!",
@@ -85,15 +89,15 @@ class Device(object):
         interfaces = []
         for my_intf,link in self.peers.items():
             interfaces.append(f"interface {my_intf}")
-            if not self.prefix == 'qrtr': # For quagga we don't need IP addresses
+            interfaces.append("   ip ospf network point-to-point")
+            if not self.prefix == 'qrtr':
                 interfaces.append(f"   ip address {link['my_ip']}/{link['link_prefix'].prefixlen}")
                 interfaces.append("   mtu 1300")
                 interfaces.append("   no switchport")
-            else:
-                interfaces.append("   ip ospf network point-to-point")
-            interfaces.append("   exit")
+                interfaces.append("   exit")
             interfaces.append("!")
         interfaces = [i for i in interfaces if i]
+        
         return '\n'.join(hostname + ospf + loopback + interfaces)
  
 
