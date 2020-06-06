@@ -357,8 +357,7 @@ class Device(object):
             full_link["local_intf"] = interface.replace("/", "_")
             full_link["local_ip"] = self.ips.get(interface, "")
 
-            my_endpoint = (self.name, interface, self.ips.get(interface, ""), link.idx)
-            peer_endpoints = [x for x in link.endpoints if x != my_endpoint]
+            peer_endpoints = link.my_peers(self.name, interface)
             peer_name, peer_intf, peer_ip, _ = peer_endpoints.pop(0)
 
             full_link["peer_intf"] = peer_intf.replace("/", "_")
