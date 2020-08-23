@@ -122,6 +122,8 @@ def parse_endpoints(devices, endpoints, link, idx):
             device = devices.get(device_name, Host(device_name))
         elif "qrtr" in device_name.lower():
             device = devices.get(device_name, Quagga(device_name))
+        elif "frr" in device_name.lower():
+            device = devices.get(device_name, FRR(device_name))
         elif "xrv" in device_name.lower():
             device = devices.get(device_name, XRV(device_name))
         elif "vmx" in device_name.lower():
@@ -648,6 +650,12 @@ class Quagga(Device):
         self.conf_path = "/etc/quagga"
         self.startup_file = "Quagga.conf"
 
+class FRR(Device):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.image = "frrouting/frr:v7.4.0"
+        self.conf_path = "/etc/frr"
+        self.startup_file = "frr.conf"
 
 class XRV(Device):
     def __init__(self, *args, **kwargs):
