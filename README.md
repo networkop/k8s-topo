@@ -1,4 +1,4 @@
-[Docker Pulls](https://img.shields.io/docker/pulls/crossplane/crossplane.svg)](https://img.shields.io/docker/pulls/crossplane/crossplane.svg)
+[![Docker Pulls](https://img.shields.io/docker/pulls/networkop/k8s-topo.svg)](https://img.shields.io/docker/pulls/networkop/k8s-topo)
 
 # k8s-topo
 Arbitrary network topology builder for network simulations inside Kubernetes. Analogous to [docker-topo](https://github.com/networkop/docker-topo). Relies on either [meshnet CNI][meshnet-cni] plugin (default) or [Network Service Mesh](#network-service-mesh).
